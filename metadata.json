@@ -1,0 +1,6 @@
+{
+  "name": "Asli Taana - Handloom Authenticator",
+  "description": "An automated AI-powered thread fingerprinting platform to authenticate genuine handwoven textiles for the Handloom Hackathon 2026.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
