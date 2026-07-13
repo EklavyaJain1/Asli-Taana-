@@ -203,14 +203,14 @@ app.post("/api/verify", async (req, res) => {
   const cleanBase64 = (base64Str: string) =>
     base64Str.replace(/^data:image\/\w+;base64,/, "");
 
-  const ai = getGeminiClient();
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
 
-  // If no Gemini client, use high-fidelity simulation
-  if (!ai) {
-    console.log("Gemini API key not found. Using high-fidelity local simulation.");
+  // If no OpenRouter key, use high-fidelity simulation
+  if (!openRouterKey || openRouterKey === "MY_OPENROUTER_API_KEY") {
+    console.log("OpenRouter API key not found. Using high-fidelity local simulation.");
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    if (scanType === "matching") {
+    if (scanType === "matching" || scanType === "custom") {
       return res.json({
         isDemoFallback: true,
         isMatch: true,
@@ -261,22 +261,8 @@ app.post("/api/verify", async (req, res) => {
     }
   }
 
-  // Real Gemini Multimodal Comparison
+  // Real OpenRouter Multimodal Comparison
   try {
-    const referenceImagePart = {
-      inlineData: {
-        mimeType: "image/jpeg" as const,
-        data: cleanBase64(referencePhoto),
-      },
-    };
-
-    const shopperImagePart = {
-      inlineData: {
-        mimeType: "image/jpeg" as const,
-        data: cleanBase64(shopperPhoto),
-      },
-    };
-
     const prompt = `You are the AI textile matching engine for "Asli Taana" ("The Real Thread"), a high-impact national-level hackathon platform designed to verify handloom authenticity.
 You are given two magnified, close-up macro photographs of a fabric weave:
 - Image 1 (First Part): The officially registered "Reference Thread Fingerprint" taken at the weaver cooperative.
@@ -301,19 +287,37 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
   "recommendation": "A friendly authenticating statement or warning, mentioning the weaver name (${weaverName || "registered weaver"})."
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [referenceImagePart, shopperImagePart, { text: prompt }],
-      config: {
-        responseMimeType: "application/json",
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Asli Taana"
       },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-nano-12b-v2-vl:free",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cleanBase64(referencePhoto)}` } },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cleanBase64(shopperPhoto)}` } }
+            ]
+          }
+        ]
+      })
     });
 
-    const resultText = response.text || "{}";
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+
+    const resultText = json.choices[0].message.content || "{}";
     const resultJson = JSON.parse(resultText.trim());
     res.json({ isDemoFallback: false, ...resultJson });
   } catch (err: any) {
-    console.error("Gemini API call failed: ", err);
+    console.error("OpenRouter API call failed: ", err);
     res
       .status(500)
       .json({ error: "AI matching failed. Please check backend logs or try again.", details: err.message });
@@ -345,7 +349,7 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Asli Taana Server] running on http://0.0.0.0:${PORT}`);
     console.log(`[DB] Persistent database: ${DB_PATH}`);
-    console.log(`[AI] Gemini client: ${getGeminiClient() ? "✅ Connected" : "⚠️  Simulation mode"}`);
+    console.log(`[AI] OpenRouter client: ${process.env.OPENROUTER_API_KEY ? "✅ Connected" : "⚠️  Simulation mode"}`);
   });
 }
 
