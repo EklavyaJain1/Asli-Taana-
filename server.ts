@@ -152,10 +152,8 @@ app.post("/api/register", (req, res) => {
     daysOfLabor,
     price,
     patternType,
-    patternStyle,
-    mainColor,
-    accentColor,
-    seed,
+    colors,
+    weaverPhoto,
     referencePhoto,
   } = req.body;
 
@@ -178,10 +176,8 @@ app.post("/api/register", (req, res) => {
     price: Number(price) || 12000,
     patternType: patternType || "Traditional Handwoven Fabric",
     registeredDate: new Date().toISOString().split("T")[0],
-    patternStyle: patternStyle || "cotton",
-    mainColor: mainColor || "#f5f5f5",
-    accentColor: accentColor || "#ffd700",
-    seed: Number(seed) || Math.floor(Math.random() * 10000),
+    colors: colors || ["#f5f5f5", "#ffd700"],
+    weaverPhoto: weaverPhoto || "",
     referencePhoto: referencePhoto || "",
   };
 

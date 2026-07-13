@@ -10,6 +10,7 @@ import ConceptSection from "./components/ConceptSection";
 import RegisterForm from "./components/RegisterForm";
 import VerifySection from "./components/VerifySection";
 import SareeList from "./components/SareeList";
+import { NavBar } from "./components/ui/tubelight-navbar";
 import { Info, Layers, ListFilter, ShieldCheck, Heart } from "lucide-react";
 
 type Tab = "concept" | "register" | "registry" | "verify";
@@ -80,43 +81,45 @@ export default function App() {
     setActiveTab("verify");
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
-    { id: "concept", label: "Core Pitch & Concept", icon: <Info className="h-4 w-4" /> },
-    { id: "register", label: "Weaver Registration Portal", icon: <Layers className="h-4 w-4" /> },
-    { id: "registry", label: `Secure Live Registry (${sarees.length})`, icon: <ListFilter className="h-4 w-4" /> },
-    { id: "verify", label: "Shopper Verification Portal", icon: <ShieldCheck className="h-4 w-4" /> },
+  const navItems = [
+    { name: "Concept", url: "#concept", icon: Info },
+    { name: "Registration", url: "#register", icon: Layers },
+    { name: "Live Registry", url: "#registry", icon: ListFilter },
+    { name: "Verification", url: "#verify", icon: ShieldCheck },
   ];
+
+  const handleNavChange = (name: string) => {
+    if (name === "Concept") setActiveTab("concept");
+    else if (name === "Registration") setActiveTab("register");
+    else if (name === "Live Registry") setActiveTab("registry");
+    else if (name === "Verification") setActiveTab("verify");
+  };
+
+  const getActiveNavName = () => {
+    if (activeTab === "concept") return "Concept";
+    if (activeTab === "register") return "Registration";
+    if (activeTab === "registry") return "Live Registry";
+    if (activeTab === "verify") return "Verification";
+    return "Concept";
+  };
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-stone-900">
-      <Header />
+      <Header 
+        navItems={navItems}
+        activeItem={getActiveNavName()}
+        onChange={handleNavChange}
+      />
 
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-        {/* Tab Navigator */}
-        <div className="flex border-b border-stone-200/80 mb-6 sm:mb-8 overflow-x-auto gap-2 relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              id={`tab-${tab.id}`}
-              className={`relative flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? "border-amber-600 text-amber-800"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
-              }`}
-              onClick={() => setActiveTab(tab.id)}>
-              {tab.icon}
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                />
-              )}
-            </button>
-          ))}
+        {/* Tubelight Navbar (Hidden on mobile, shown on desktop) */}
+        <div className="hidden sm:block">
+          <NavBar 
+            items={navItems} 
+            activeItem={getActiveNavName()} 
+            onChange={handleNavChange} 
+          />
         </div>
 
         {/* Tab Content with AnimatePresence */}

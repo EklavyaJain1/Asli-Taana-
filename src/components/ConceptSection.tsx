@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { AlertCircle, Fingerprint, IndianRupee, Users, Shield, Map } from "lucide-react";
+import { AlertCircle, Fingerprint } from "lucide-react";
 
 interface Saree {
   id: string;
@@ -29,10 +29,7 @@ interface ConceptSectionProps {
 }
 
 export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
-  // Calculate stats
-  const totalValue = sarees.reduce((sum, saree) => sum + saree.price, 0);
-  const uniqueWeavers = new Set(sarees.map((s) => s.weaverName)).size;
-  const uniqueVillages = new Set(sarees.map((s) => s.village)).size;
+  // Removed unused stats variables
 
   return (
     <div className="bg-[#f9f8f4] border border-[#1a1a1a]/15 rounded-none p-6 md:p-10 shadow-xs">
@@ -53,38 +50,7 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
           </p>
         </div>
 
-        {/* Dashboard / Stats Section */}
-        {sarees.length > 0 && (
-          <div className="mb-14 bg-white border border-[#1a1a1a]/15 p-6 rounded-none shadow-xs">
-            <h3 className="font-serif text-lg font-bold text-[#1a1a1a] mb-6 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-[#137333]" />
-              Live Impact Dashboard
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[#f9f8f4] border border-[#1a1a1a]/10 p-4 text-center flex flex-col items-center justify-center">
-                <Shield className="h-5 w-5 text-[#b45309] mb-2" />
-                <span className="text-2xl font-serif font-bold text-[#1a1a1a]">{sarees.length}</span>
-                <span className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/50 mt-1">Items Secured</span>
-              </div>
-              <div className="bg-[#f9f8f4] border border-[#1a1a1a]/10 p-4 text-center flex flex-col items-center justify-center">
-                <Users className="h-5 w-5 text-[#b45309] mb-2" />
-                <span className="text-2xl font-serif font-bold text-[#1a1a1a]">{uniqueWeavers}</span>
-                <span className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/50 mt-1">Active Artisans</span>
-              </div>
-              <div className="bg-[#f9f8f4] border border-[#1a1a1a]/10 p-4 text-center flex flex-col items-center justify-center">
-                <Map className="h-5 w-5 text-[#b45309] mb-2" />
-                <span className="text-2xl font-serif font-bold text-[#1a1a1a]">{uniqueVillages}</span>
-                <span className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/50 mt-1">Village Clusters</span>
-              </div>
-              <div className="bg-[#f9f8f4] border border-[#1a1a1a]/10 p-4 text-center flex flex-col items-center justify-center">
-                <IndianRupee className="h-5 w-5 text-[#137333] mb-2" />
-                <span className="text-xl font-mono font-bold text-[#1a1a1a]">₹{totalValue.toLocaleString("en-IN")}</span>
-                <span className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/50 mt-1">Value Protected</span>
-              </div>
-            </div>
-          </div>
-        )}
- 
+
         {/* 2-Column Problem & Solution */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border border-[#1a1a1a]/15 mb-12">
           

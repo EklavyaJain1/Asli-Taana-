@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { generateFabricDataUrl } from "../utils/fabricGenerator";
 import {
   ShieldAlert, ShieldCheck, Loader2, Upload, Eye, EyeOff,
-  Camera, CameraOff, RefreshCw, X
+  Camera, CameraOff, RefreshCw, X, User
 } from "lucide-react";
 
 interface Saree {
@@ -22,11 +22,14 @@ interface Saree {
   price: number;
   patternType: string;
   registeredDate: string;
-  patternStyle: "cotton" | "silk" | "kasavu" | "paithani";
-  mainColor: string;
-  accentColor: string;
-  seed: number;
+  colors?: string[];
+  weaverPhoto?: string;
   referencePhoto?: string;
+  // Fallbacks for older data
+  patternStyle?: string;
+  mainColor?: string;
+  accentColor?: string;
+  seed?: number;
 }
 
 interface VerifySectionProps {
@@ -75,6 +78,11 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
   useEffect(() => {
     if (!selectedSaree) return;
 
+    const mainColor = selectedSaree.colors?.[0] || selectedSaree.mainColor || "#f5f5f5";
+    const accentColor = selectedSaree.colors?.[1] || selectedSaree.accentColor || "#ffd700";
+    const patternStyle = (selectedSaree.patternStyle as any) || "cotton";
+    const seed = selectedSaree.seed || 1234;
+
     if (selectedSaree.referencePhoto && selectedSaree.referencePhoto.startsWith("data:image")) {
       // Use real camera capture from registration
       setReferencePhoto(selectedSaree.referencePhoto);
@@ -82,10 +90,10 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
       // Fallback to procedural generation for seed data
       const refUrl = generateFabricDataUrl({
         type: "handloom",
-        mainColor: selectedSaree.mainColor,
-        accentColor: selectedSaree.accentColor,
-        patternStyle: selectedSaree.patternStyle,
-        seed: selectedSaree.seed,
+        mainColor,
+        accentColor,
+        patternStyle,
+        seed,
         rotation: 0,
         lighting: "neutral",
         cameraNoise: false,
@@ -96,10 +104,10 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
     if (scanPresetType === "matching") {
       setShopperPhoto(generateFabricDataUrl({
         type: "handloom",
-        mainColor: selectedSaree.mainColor,
-        accentColor: selectedSaree.accentColor,
-        patternStyle: selectedSaree.patternStyle,
-        seed: selectedSaree.seed,
+        mainColor,
+        accentColor,
+        patternStyle,
+        seed,
         rotation: 4,
         lighting: "shop_warm",
         cameraNoise: true,
@@ -107,10 +115,10 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
     } else if (scanPresetType === "powerloom") {
       setShopperPhoto(generateFabricDataUrl({
         type: "powerloom",
-        mainColor: selectedSaree.mainColor,
-        accentColor: selectedSaree.accentColor,
-        patternStyle: selectedSaree.patternStyle,
-        seed: selectedSaree.seed,
+        mainColor,
+        accentColor,
+        patternStyle,
+        seed,
         rotation: 0,
         lighting: "shop_warm",
         cameraNoise: true,
@@ -269,10 +277,19 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
                 </div>
               </div>
 
-              <div className="pb-2">
-                <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Registered Master Artisan</span>
-                <p className="font-bold text-[#1a1a1a] mt-1">{selectedSaree.weaverName}, {selectedSaree.weaverAge} yrs</p>
-                <p className="text-[#1a1a1a]/70 italic text-xs mt-1 leading-relaxed">&quot;{selectedSaree.weaverBio}&quot;</p>
+              <div className="pb-2 flex items-center gap-4 border-t border-[#1a1a1a]/10 pt-3">
+                {selectedSaree.weaverPhoto ? (
+                  <img src={selectedSaree.weaverPhoto} alt="Weaver" className="w-12 h-12 border border-[#1a1a1a]/20 object-cover shadow-sm" />
+                ) : (
+                  <div className="w-12 h-12 bg-stone-100 flex items-center justify-center border border-[#1a1a1a]/10">
+                    <User className="w-6 h-6 text-stone-300" />
+                  </div>
+                )}
+                <div>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Registered Master Artisan</span>
+                  <p className="font-bold text-[#1a1a1a] mt-1">{selectedSaree.weaverName}, {selectedSaree.weaverAge} yrs</p>
+                  <p className="text-[#1a1a1a]/70 italic text-xs mt-1 leading-relaxed">&quot;{selectedSaree.weaverBio}&quot;</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t border-[#1a1a1a]/10 pt-4">
@@ -283,6 +300,21 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
                 <div>
                   <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Artisan Labor</span>
                   <p className="font-bold text-[#1a1a1a] mt-0.5">{selectedSaree.daysOfLabor} days</p>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Garment Palette</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {selectedSaree.colors ? (
+                      selectedSaree.colors.map((c, idx) => (
+                        <div key={idx} className="w-3.5 h-3.5 border border-[#1a1a1a]/30" style={{ backgroundColor: c }} title={c}></div>
+                      ))
+                    ) : (
+                      <div className="flex gap-1">
+                        <div className="w-3.5 h-3.5 border border-[#1a1a1a]/30" style={{ backgroundColor: selectedSaree.mainColor }} title={selectedSaree.mainColor}></div>
+                        <div className="w-3.5 h-3.5 border border-[#1a1a1a]/30" style={{ backgroundColor: selectedSaree.accentColor }} title={selectedSaree.accentColor}></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="col-span-2 border-t border-[#1a1a1a]/5 pt-2.5">
                   <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Registered Cooperative Union</span>
@@ -304,7 +336,9 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
             </div>
             <p className="text-[10px] text-white/60 mt-3 font-mono text-center leading-relaxed">
               Micro-lens weave coordinate tag.<br />
-              Coordinate Seed: <span className="text-[#b45309] font-bold">{selectedSaree.seed}</span> (Handloom)
+              {selectedSaree.seed && (
+                <>Coordinate Seed: <span className="text-[#b45309] font-bold">{selectedSaree.seed}</span> (Handloom)</>
+              )}
             </p>
           </div>
         )}
