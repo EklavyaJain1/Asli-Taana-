@@ -6,3 +6,26 @@
   --font-serif: "Crimson Pro", Georgia, Cambria, serif;
   --font-mono: "JetBrains Mono", monospace;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-certificate, #print-certificate * {
+    visibility: visible;
+  }
+  #print-certificate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 2px solid #1a1a1a !important;
+  }
+  /* Hide the print button itself */
+  #print-certificate button {
+    display: none !important;
+  }
+}

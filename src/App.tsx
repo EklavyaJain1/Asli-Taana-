@@ -4,12 +4,15 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import ConceptSection from "./components/ConceptSection";
 import RegisterForm from "./components/RegisterForm";
 import VerifySection from "./components/VerifySection";
 import SareeList from "./components/SareeList";
-import { Info, Layers, ListFilter, ShieldCheck, Heart, Github } from "lucide-react";
+import { Info, Layers, ListFilter, ShieldCheck, Heart } from "lucide-react";
+
+type Tab = "concept" | "register" | "registry" | "verify";
 
 interface Saree {
   id: string;
@@ -30,12 +33,25 @@ interface Saree {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"concept" | "register" | "registry" | "verify">("concept");
+  const [activeTab, setActiveTab] = useState<Tab>("concept");
   const [sarees, setSarees] = useState<Saree[]>([]);
   const [selectedSareeId, setSelectedSareeId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch registered sarees from the backend server
+  // ── URL Deep Linking ──────────────────────────────────────────────────────
+  // When opening via QR code: ?id=AT-2026-XXXX → auto-select saree & go to verify
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (id) {
+      setSelectedSareeId(id);
+      setActiveTab("verify");
+      // Clean the URL without reloading the page
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // ── Fetch sarees from backend ─────────────────────────────────────────────
   const fetchSarees = async () => {
     setIsLoading(true);
     try {
@@ -51,116 +67,91 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    fetchSarees();
-  }, []);
+  useEffect(() => { fetchSarees(); }, []);
 
-  // Handler when a weaver registers a new saree
   const handleNewRegistration = (newSaree: any) => {
-    // Add to local state first for immediate UI response
-    setSarees(prev => [newSaree, ...prev]);
-    // Set active ID so verify section loads it
+    setSarees((prev) => [newSaree, ...prev]);
     setSelectedSareeId(newSaree.id);
-    // Refresh database array from server
     fetchSarees();
   };
 
-  // Switch to verify tab and select a specific Saree ID
   const handleVerifySaree = (id: string) => {
     setSelectedSareeId(id);
     setActiveTab("verify");
   };
 
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { id: "concept", label: "Core Pitch & Concept", icon: <Info className="h-4 w-4" /> },
+    { id: "register", label: "Weaver Registration Portal", icon: <Layers className="h-4 w-4" /> },
+    { id: "registry", label: `Secure Live Registry (${sarees.length})`, icon: <ListFilter className="h-4 w-4" /> },
+    { id: "verify", label: "Shopper Verification Portal", icon: <ShieldCheck className="h-4 w-4" /> },
+  ];
+
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-stone-900">
-      
-      {/* Top Navigation Branding Header */}
       <Header />
 
-      {/* Main Content Stage */}
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        
-        {/* Tab Navigator Switcher */}
-        <div className="flex border-b border-stone-200/80 mb-6 sm:mb-8 overflow-x-auto gap-2">
-          
-          <button
-            type="button"
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "concept"
-                ? "border-amber-600 text-amber-800"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-            onClick={() => setActiveTab("concept")}
-          >
-            <Info className="h-4 w-4" />
-            Core Pitch & Concept
-          </button>
 
-          <button
-            type="button"
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "register"
-                ? "border-amber-600 text-amber-800"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-            onClick={() => setActiveTab("register")}
-          >
-            <Layers className="h-4 w-4" />
-            Weaver Registration Portal
-          </button>
-
-          <button
-            type="button"
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "registry"
-                ? "border-amber-600 text-amber-800"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-            onClick={() => setActiveTab("registry")}
-          >
-            <ListFilter className="h-4 w-4" />
-            Secure Live Registry ({sarees.length})
-          </button>
-
-          <button
-            type="button"
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "verify"
-                ? "border-amber-600 text-amber-800"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-            onClick={() => setActiveTab("verify")}
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Shopper Verification Portal
-          </button>
-
+        {/* Tab Navigator */}
+        <div className="flex border-b border-stone-200/80 mb-6 sm:mb-8 overflow-x-auto gap-2 relative">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              id={`tab-${tab.id}`}
+              className={`relative flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "border-amber-600 text-amber-800"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+              onClick={() => setActiveTab(tab.id)}>
+              {tab.icon}
+              {tab.label}
+              {activeTab === tab.id && (
+                <motion.div
+                  layoutId="tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Tab Sections Rendering */}
-        <div className="transition-all duration-300">
-          
-          {activeTab === "concept" && (
-            <ConceptSection />
-          )}
+        {/* Tab Content with AnimatePresence */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}>
 
-          {activeTab === "register" && (
-            <RegisterForm onRegisterSuccess={handleNewRegistration} />
-          )}
+            {activeTab === "concept" && <ConceptSection sarees={sarees} />}
+            {activeTab === "register" && <RegisterForm onRegisterSuccess={handleNewRegistration} />}
+            {activeTab === "registry" && (
+              isLoading ? (
+                <div className="flex items-center justify-center py-24 text-stone-400">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-sans uppercase tracking-widest">Loading Registry...</span>
+                  </div>
+                </div>
+              ) : (
+                <SareeList sarees={sarees} onSelectVerify={handleVerifySaree} />
+              )
+            )}
+            {activeTab === "verify" && (
+              <VerifySection sarees={sarees} currentSareeId={selectedSareeId} />
+            )}
 
-          {activeTab === "registry" && (
-            <SareeList sarees={sarees} onSelectVerify={handleVerifySaree} />
-          )}
-
-          {activeTab === "verify" && (
-            <VerifySection sarees={sarees} currentSareeId={selectedSareeId} />
-          )}
-
-        </div>
+          </motion.div>
+        </AnimatePresence>
 
       </main>
 
-      {/* Footer Branding details */}
+      {/* Footer */}
       <footer className="bg-stone-900 border-t border-amber-900/20 text-stone-400 py-6 text-center mt-12 text-xs">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
@@ -169,7 +160,6 @@ export default function App() {
               Preserving cultural heritage and protecting weaver economics using AI thread fingerprinting.
             </p>
           </div>
-          
           <div className="flex items-center gap-2 font-mono text-[10px] text-stone-500">
             <span>Built with Love</span>
             <Heart className="h-3.5 w-3.5 text-rose-600 fill-rose-600" />
@@ -177,7 +167,6 @@ export default function App() {
           </div>
         </div>
       </footer>
-
     </div>
   );
 }
