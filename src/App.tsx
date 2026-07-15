@@ -10,8 +10,10 @@ import ConceptSection from "./components/ConceptSection";
 import RegisterForm from "./components/RegisterForm";
 import VerifySection from "./components/VerifySection";
 import SareeList from "./components/SareeList";
+import LoadingScreen from "./components/LoadingScreen";
 import { NavBar } from "./components/ui/tubelight-navbar";
 import { Info, Layers, ListFilter, ShieldCheck, Heart } from "lucide-react";
+import { useLanguage } from "./contexts/LanguageContext";
 
 type Tab = "concept" | "register" | "registry" | "verify";
 
@@ -38,6 +40,8 @@ export default function App() {
   const [sarees, setSarees] = useState<Saree[]>([]);
   const [selectedSareeId, setSelectedSareeId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAppLoading, setIsAppLoading] = useState(true);
+  const { t } = useLanguage();
 
   // ── URL Deep Linking ──────────────────────────────────────────────────────
   // When opening via QR code: ?id=AT-2026-XXXX → auto-select saree & go to verify
@@ -82,11 +86,16 @@ export default function App() {
   };
 
   const navItems = [
-    { name: "Concept", url: "#concept", icon: Info },
-    { name: "Registration", url: "#register", icon: Layers },
-    { name: "Live Registry", url: "#registry", icon: ListFilter },
-    { name: "Verification", url: "#verify", icon: ShieldCheck },
+    { name: "Concept", key: "concept", url: "#concept", icon: Info },
+    { name: "Registration", key: "register", url: "#register", icon: Layers },
+    { name: "Live Registry", key: "registry", url: "#registry", icon: ListFilter },
+    { name: "Verification", key: "verify", url: "#verify", icon: ShieldCheck },
   ];
+  
+  const translatedNavItems = navItems.map(item => ({
+    ...item,
+    name: t(`nav.${item.key}`)
+  }));
 
   const handleNavChange = (name: string) => {
     if (name === "Concept") setActiveTab("concept");
@@ -105,6 +114,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-stone-900">
+      <AnimatePresence>
+        {isAppLoading && <LoadingScreen onComplete={() => setIsAppLoading(false)} />}
+      </AnimatePresence>
+
       <Header 
         navItems={navItems}
         activeItem={getActiveNavName()}
@@ -116,9 +129,15 @@ export default function App() {
         {/* Tubelight Navbar (Hidden on mobile, shown on desktop) */}
         <div className="hidden sm:block">
           <NavBar 
-            items={navItems} 
-            activeItem={getActiveNavName()} 
-            onChange={handleNavChange} 
+            items={translatedNavItems} 
+            activeItem={t(`nav.${navItems.find(i => i.name === getActiveNavName())?.key}`)} 
+            onChange={(name) => {
+              const originalItem = translatedNavItems.find(i => i.name === name);
+              if (originalItem) {
+                const idx = translatedNavItems.indexOf(originalItem);
+                handleNavChange(navItems[idx].name);
+              }
+            }} 
           />
         </div>
 
@@ -158,15 +177,15 @@ export default function App() {
       <footer className="bg-stone-900 border-t border-amber-900/20 text-stone-400 py-6 text-center mt-12 text-xs">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-serif text-amber-500 font-bold text-sm tracking-wide">Asli Taana — National Handloom Hackathon 2026</p>
+            <p className="font-serif text-amber-500 font-bold text-sm tracking-wide">{t("footer.title")}</p>
             <p className="text-[10px] mt-1 text-stone-500">
-              Preserving cultural heritage and protecting weaver economics using AI thread fingerprinting.
+              {t("footer.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2 font-mono text-[10px] text-stone-500">
-            <span>Built with Love</span>
+            <span>{t("footer.built")}</span>
             <Heart className="h-3.5 w-3.5 text-rose-600 fill-rose-600" />
-            <span>&amp; respect for Indian Weavers</span>
+            <span>{t("footer.respect")}</span>
           </div>
         </div>
       </footer>

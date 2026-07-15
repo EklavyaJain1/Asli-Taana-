@@ -16,6 +16,9 @@ export interface Saree {
   patternType: string;
   registeredDate: string;
   referencePhoto: string; // base64 or SVG
+  detectedStyle?: string;
+  styleConfidence?: number;
+  styleNotes?: string;
 }
 
 export interface VerificationResult {
@@ -28,4 +31,7 @@ export interface VerificationResult {
     patternAlignment: string;
   };
   recommendation: string;
+  detectedStyle?: string;
+  styleConfidence?: number;
+  styleNotes?: string;
 }

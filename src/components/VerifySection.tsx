@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { generateFabricDataUrl } from "../utils/fabricGenerator";
+import { useLanguage } from "../contexts/LanguageContext";
 import {
   ShieldAlert, ShieldCheck, Loader2, Upload, Eye, EyeOff,
   Camera, CameraOff, RefreshCw, X, User
@@ -38,6 +39,7 @@ interface VerifySectionProps {
 }
 
 export default function VerifySection({ sarees, currentSareeId }: VerifySectionProps) {
+  const { t } = useLanguage();
   const [selectedSareeId, setSelectedSareeId] = useState("");
   const [selectedSaree, setSelectedSaree] = useState<Saree | null>(null);
   const [referencePhoto, setReferencePhoto] = useState<string>("");
@@ -235,7 +237,7 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
   const loadingMessages = [
     "Locating registered weave fingerprint on Secure Database...",
     "Scanning shopper photo and evaluating thread slubs...",
-    "Cross-referencing warp & weft tension variances via Gemini Multimodal...",
+    "Cross-referencing warp & weft tension variances via AI...",
     "Finalizing structural textile match analysis reports...",
   ];
 
@@ -248,31 +250,51 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
         {/* Step 1 */}
         <div className="bg-white border border-[#1a1a1a]/15 rounded-none p-6 shadow-xs">
           <span className="text-[9px] font-sans font-bold tracking-widest text-[#b45309] bg-[#b45309]/5 border border-[#b45309]/20 px-3 py-1.5 rounded-none uppercase">
-            Step 1: Scan Label or Select ID
+            {t("verify.step1")}
           </span>
-          <h3 className="font-serif text-xl font-bold text-[#1a1a1a] mt-5 mb-4">Claimed Saree Identity</h3>
+          <h3 className="font-serif text-xl font-bold text-[#1a1a1a] mt-5 mb-4">{t("verify.title1")}</h3>
 
           <div className="mb-4">
-            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/60 mb-1.5">Active Saree ID (QR Target)</label>
+            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/60 mb-1.5">{t("verify.active")}</label>
             <select
-              className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-3 bg-[#f9f8f4] text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+              className="w-full border border-[#1a1a1a]/20 p-2.5 rounded-none bg-white font-mono text-sm text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] shadow-inner"
               value={selectedSareeId}
-              onChange={(e) => setSelectedSareeId(e.target.value)}>
-              {sarees.map((s) => (
-                <option key={s.id} value={s.id}>{s.id} — {s.weaverName} ({s.village})</option>
+              onChange={(e) => setSelectedSareeId(e.target.value)}
+            >
+              <option value="" disabled>{t("verify.active.placeholder")}</option>
+              {sarees.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.id} - {t(s.weaverName)} ({t(s.village)})
+                </option>
               ))}
             </select>
           </div>
 
           {selectedSaree && (
             <div className="space-y-4 border-t border-[#1a1a1a]/10 pt-4 font-serif text-[#1a1a1a]/95 text-xs md:text-sm">
-              <div className="flex justify-between items-start gap-4">
+              <div className="flex justify-between items-end mb-4">
                 <div>
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Claimed Pattern Type</span>
-                  <p className="font-serif font-bold text-base text-[#1a1a1a] mt-1">{selectedSaree.patternType}</p>
+                  <span className="block text-[10px] font-sans uppercase tracking-widest text-[#1a1a1a]/50 font-bold mb-1">{t("registry.weaver")}</span>
+                  <span className="font-serif text-lg font-bold text-[#1a1a1a]">{t(selectedSaree.weaverName)}</span>
                 </div>
                 <div className="text-right">
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Fair Trade Value</span>
+                  <span className="block text-[10px] font-sans uppercase tracking-widest text-[#1a1a1a]/50 font-bold mb-1">{t("register.village")}</span>
+                  <span className="font-serif text-[#1a1a1a]">{t(selectedSaree.village)}</span>
+                </div>
+              </div>
+
+              <div className="bg-[#f9f8f4] p-3 border border-[#1a1a1a]/10 rounded-none flex items-center justify-between">
+                <span className="text-[10px] font-sans uppercase tracking-widest text-[#1a1a1a]/60 font-bold">{t("registry.material")}</span>
+                <span className="font-serif text-sm text-[#1a1a1a] font-bold">{t(selectedSaree.material)}</span>
+              </div>
+
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.claimedPattern")}</span>
+                  <p className="font-serif font-bold text-base text-[#1a1a1a] mt-1">{t(selectedSaree.patternType)}</p>
+                </div>
+                <div className="text-right">
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.fairTrade")}</span>
                   <p className="font-mono font-bold text-[#b45309] text-base mt-1">₹{selectedSaree.price.toLocaleString("en-IN")}</p>
                 </div>
               </div>
@@ -286,23 +308,23 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
                   </div>
                 )}
                 <div>
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Registered Master Artisan</span>
-                  <p className="font-bold text-[#1a1a1a] mt-1">{selectedSaree.weaverName}, {selectedSaree.weaverAge} yrs</p>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.registeredArtisan")}</span>
+                  <p className="font-bold text-[#1a1a1a] mt-1">{t(selectedSaree.weaverName)}, {selectedSaree.weaverAge} yrs</p>
                   <p className="text-[#1a1a1a]/70 italic text-xs mt-1 leading-relaxed">&quot;{selectedSaree.weaverBio}&quot;</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t border-[#1a1a1a]/10 pt-4">
                 <div>
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Village Cluster</span>
-                  <p className="font-bold text-[#1a1a1a] mt-0.5">{selectedSaree.village}</p>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.villageCluster")}</span>
+                  <p className="font-bold text-[#1a1a1a] mt-0.5">{t(selectedSaree.village)}</p>
                 </div>
                 <div>
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Artisan Labor</span>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.labor")}</span>
                   <p className="font-bold text-[#1a1a1a] mt-0.5">{selectedSaree.daysOfLabor} days</p>
                 </div>
                 <div>
-                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">Garment Palette</span>
+                  <span className="block text-[9px] font-sans uppercase tracking-widest font-bold text-[#1a1a1a]/45">{t("verify.palette")}</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {selectedSaree.colors ? (
                       selectedSaree.colors.map((c, idx) => (
@@ -350,16 +372,16 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
         {/* Step 2 */}
         <div>
           <span className="text-[9px] font-sans font-bold tracking-widest text-[#b45309] bg-[#b45309]/5 border border-[#b45309]/20 px-3 py-1.5 rounded-none uppercase">
-            Step 2: Simulate or Capture Retail Store Scan
+            {t("verify.step2")}
           </span>
-          <h3 className="font-serif text-xl font-bold text-[#1a1a1a] mt-5 mb-4">Fresh Shop Scan</h3>
+          <h3 className="font-serif text-xl font-bold text-[#1a1a1a] mt-5 mb-4">{t("verify.title2")}</h3>
 
           {/* Scan preset buttons */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
             {[
-              { key: "matching", label: "Genuine", desc: "Authentic registered handwoven saree.", dot: "#137333" },
-              { key: "powerloom", label: "Powerloom Clone", desc: "Counterfeit: machine grid lines.", dot: "#c5221f" },
-              { key: "different", label: "Different Saree", desc: "Scan of a completely different weaver.", dot: "#b45309" },
+              { key: "matching", label: t("verify.btn.genuine"), desc: t("verify.btn.genuineDesc"), dot: "#137333" },
+              { key: "powerloom", label: t("verify.btn.clone"), desc: t("verify.btn.cloneDesc"), dot: "#c5221f" },
+              { key: "different", label: t("verify.btn.diff"), desc: t("verify.btn.diffDesc"), dot: "#b45309" },
             ].map(({ key, label, desc, dot }) => (
               <button key={key} type="button"
                 className={`p-3.5 rounded-none border flex flex-col items-start gap-1.5 transition-all text-left ${
@@ -382,14 +404,14 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
           {/* Side-by-side comparison */}
           <div className="grid grid-cols-2 gap-4 bg-[#f9f8f4] border border-[#1a1a1a]/10 p-5 rounded-none">
             <div className="flex flex-col items-center">
-              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/50 uppercase tracking-widest mb-2.5">Registered Original</span>
+              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/50 uppercase tracking-widest mb-2.5">{t("verify.orig")}</span>
               <div className="h-32 w-32 rounded-none overflow-hidden border border-[#1a1a1a]/15 bg-white p-0.5">
                 <img src={referencePhoto} alt="Original Weave" className="h-full w-full object-cover" />
               </div>
             </div>
 
             <div className="flex flex-col items-center relative">
-              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/50 uppercase tracking-widest mb-2.5">Retail Shop Photo</span>
+              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/50 uppercase tracking-widest mb-2.5">{t("verify.retail")}</span>
               <div className="h-32 w-32 rounded-none overflow-hidden border border-[#1a1a1a]/15 relative bg-white p-0.5">
                 {shopperPhoto ? (
                   <img src={shopperPhoto} alt="Shop Weave" className="h-full w-full object-cover" />
@@ -464,9 +486,9 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
             className="w-full bg-[#1a1a1a] hover:bg-[#b45309] text-white font-sans font-bold text-xs uppercase tracking-widest py-3.5 px-4 rounded-none border border-[#1a1a1a] transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-5 shadow-xs"
             onClick={runVerification}>
             {isVerifying ? (
-              <><Loader2 className="h-4 w-4 animate-spin text-white" /> Comparing Weave Signatures...</>
+              <><Loader2 className="h-4 w-4 animate-spin text-white" /> {t("verify.analyzing")}</>
             ) : (
-              <><ShieldCheck className="h-4 w-4 text-white" /> Run AI Authenticity Engine (Gemini)</>
+              <><ShieldCheck className="h-4 w-4 text-white" /> {t("verify.run")}</>
             )}
           </button>
         </div>
@@ -502,10 +524,10 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
                 </div>
                 <div>
                   <h4 className={`font-serif text-lg font-bold ${verificationResult.isMatch ? "text-[#137333]" : "text-[#c5221f]"}`}>
-                    {verificationResult.isMatch ? "Authentic Saree Verified" : "Authentication Alert / Mismatch"}
+                    {verificationResult.isMatch ? t("verify.result.match") : t("verify.result.mismatch")}
                   </h4>
                   <p className="text-xs text-[#1a1a1a]/60 font-mono mt-1">
-                    Match Confidence Score: <span className="font-bold text-[#1a1a1a]">{verificationResult.matchScore}%</span>
+                    {t("verify.result.score")} <span className="font-bold text-[#1a1a1a]">{verificationResult.matchScore}%</span>
                   </p>
                 </div>
               </div>
@@ -524,13 +546,38 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
               </div>
             </div>
 
+            {/* AI-Identified Weaving Style */}
+            {verificationResult.detectedStyle && (
+              <div className="bg-[#fff8e1] border border-[#b45309]/30 p-4 rounded-none flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-sans font-bold text-[#b45309] uppercase tracking-widest">
+                    {t("verify.style")}
+                  </span>
+                  <span className="text-[9px] font-mono bg-white px-2 py-0.5 border border-[#b45309]/20 text-[#b45309]">
+                    {t("verify.conf")} {verificationResult.styleConfidence}%
+                  </span>
+                </div>
+                <p className="text-base font-serif font-bold text-[#1a1a1a]">
+                  {verificationResult.detectedStyle}
+                </p>
+                {verificationResult.styleNotes && (
+                  <p className="text-xs text-[#1a1a1a]/70 font-serif leading-relaxed">
+                    {verificationResult.styleNotes}
+                  </p>
+                )}
+                <p className="text-[9px] text-[#1a1a1a]/40 font-sans italic mt-1">
+                  * {t("verify.style.disclaimer")}
+                </p>
+              </div>
+            )}
+
             {/* AI Reasoning */}
             <div className="bg-white p-4 rounded-none border border-[#1a1a1a]/10">
-              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/55 uppercase tracking-widest">AI Visual Reasoning Report</span>
+              <span className="text-[9px] font-sans font-bold text-[#1a1a1a]/55 uppercase tracking-widest">{t("verify.result.reason")}</span>
               <p className="text-xs md:text-sm text-[#1a1a1a] leading-relaxed font-serif mt-1.5">{verificationResult.reasoning}</p>
               {verificationResult.isDemoFallback && (
                 <div className="mt-3 text-[9px] font-mono text-[#b45309] bg-[#b45309]/5 border border-[#b45309]/20 p-2.5 rounded-none leading-normal">
-                  ⚠️ Running in local simulation mode. Set a valid GEMINI_API_KEY to activate real visual AI analysis.
+                  ⚠️ Running in local simulation mode. Set a valid OPENROUTER_API_KEY to activate real visual AI analysis.
                 </div>
               )}
             </div>

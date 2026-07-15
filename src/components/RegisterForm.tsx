@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
+import { useLanguage } from "../contexts/LanguageContext";
+import WhatsAppSimulator from "./WhatsAppSimulator";
 
 interface RegisterFormProps {
   onRegisterSuccess: (newSaree: any) => void;
@@ -38,25 +40,45 @@ const COLOR_SHADES: Record<string, string[]> = {
 };
 
 export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
+  const { t, language } = useLanguage();
+  
+  // Registration Mode
+  const [registrationMode, setRegistrationMode] = useState<"web" | "whatsapp">("web");
+
   // Form states
   const [weaverName, setWeaverName] = useState("Rajendra Prasad");
   const [weaverAge, setWeaverAge] = useState(45);
   const [weaverBio, setWeaverBio] = useState("A skilled cotton and silk weaver preserving traditional jacquard techniques passed down through 4 generations.");
   const [village, setVillage] = useState("Chanderi");
   const [cooperative, setCooperative] = useState("Chanderi Handloom Weavers Union");
-  const [material, setMaterial] = useState("Fine Mulberry Silk & Organic Cotton Blend (Chanderi)");
-  const [daysOfLabor, setDaysOfLabor] = useState(9);
-  const [price, setPrice] = useState(11200);
+  const [material, setMaterial] = useState("Silk");
+  const [daysOfLabor, setDaysOfLabor] = useState(14);
+  const [price, setPrice] = useState(12500);
   const [patternType, setPatternType] = useState("Chanderi Golden Booti Saree");
   
+  // Auto-translate defaults on language switch
+  useEffect(() => {
+    if (weaverName === "Rajendra Prasad" || weaverName === "राजेंद्र प्रसाद") setWeaverName(t("default.weaverName"));
+    if (village === "Chanderi" || village === "चंदेरी") setVillage(t("default.village"));
+    if (cooperative === "Chanderi Handloom Weavers Union" || cooperative === "चंदेरी हथकरघा बुनकर संघ") setCooperative(t("default.cooperative"));
+    if (patternType === "Chanderi Golden Booti Saree" || patternType === "चंदेरी गोल्डन बूटी साड़ी") setPatternType(t("default.pattern"));
+    if (material === "Silk" || material === "रेशम") setMaterial(t("default.material"));
+  }, [language, t]);
+  
   // Advanced Colors
-  const [colors, setColors] = useState<string[]>(["#d2b48c", "#d4af37"]);
+  const [colors, setColors] = useState<string[]>([]);
   const [colorInput, setColorInput] = useState("");
   const [suggestedShades, setSuggestedShades] = useState<string[]>([]);
   
   // Headshot & Master Fingerprint
   const [weaverPhoto, setWeaverPhoto] = useState<string>("");
   const [referenceFingerprint, setReferenceFingerprint] = useState<string>("");
+
+  const [detectedStyle, setDetectedStyle] = useState<string>("");
+  const [styleConfidence, setStyleConfidence] = useState<number>(0);
+  const [styleNotes, setStyleNotes] = useState<string>("");
+  const [isClassifyingStyle, setIsClassifyingStyle] = useState(false);
+  const [styleMismatchWarning, setStyleMismatchWarning] = useState<string>("");
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [registeredSaree, setRegisteredSaree] = useState<any | null>(null);
@@ -102,23 +124,25 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
     
     if (COLOR_SHADES[lowerVal]) {
       setSuggestedShades(COLOR_SHADES[lowerVal]);
-    } else if (/^#[0-9A-Fa-f]{6}$/i.test(lowerVal)) {
-      setColors([...colors, lowerVal]);
-      setColorInput("");
-      setSuggestedShades([]);
     } else {
       setSuggestedShades([]);
     }
   };
 
-  const addShade = (shade: string) => {
-    setColors([...colors, shade]);
+  const handleColorAdd = () => {
+    if (colorInput.trim() && !colors.includes(colorInput.trim())) {
+      setColors([...colors, colorInput.trim()]);
+    }
     setColorInput("");
     setSuggestedShades([]);
   };
 
-  const removeColor = (index: number) => {
-    setColors(colors.filter((_, i) => i !== index));
+  const removeColor = (idx: number) => {
+    setColors(colors.filter((_, i) => i !== idx));
+  };
+  
+  const applyTheme = (themeColors: string[]) => {
+    setColors(themeColors);
   };
 
   // ── File Uploads ──────────────────────────────────────────────────────────
@@ -178,6 +202,58 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
     stopCamera();
   };
 
+  // ── Style Classification Hook ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!referenceFingerprint) {
+      setDetectedStyle("");
+      setStyleConfidence(0);
+      setStyleNotes("");
+      setStyleMismatchWarning("");
+      return;
+    }
+
+    const classifyStyle = async () => {
+      setIsClassifyingStyle(true);
+      setStyleMismatchWarning("");
+      try {
+        const response = await fetch("/api/classify-style", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referencePhoto: referenceFingerprint })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDetectedStyle(data.detectedStyle || "");
+          setStyleConfidence(data.styleConfidence || 0);
+          setStyleNotes(data.styleNotes || "");
+        }
+      } catch (err) {
+        console.error("Failed to classify style", err);
+      } finally {
+        setIsClassifyingStyle(false);
+      }
+    };
+    classifyStyle();
+  }, [referenceFingerprint]);
+
+  useEffect(() => {
+    if (detectedStyle && styleConfidence > 50 && detectedStyle !== "Unidentified/Other") {
+      const combinedInput = `${patternType} ${material}`.toLowerCase();
+      const detectedLower = detectedStyle.toLowerCase();
+      const detectedWords = detectedLower.split(" ").filter((w: string) => w.length > 4);
+      
+      const hasMatch = detectedWords.some((w: string) => combinedInput.includes(w));
+      
+      if (!hasMatch) {
+        setStyleMismatchWarning(`AI detected "${detectedStyle}" style, but you entered "${patternType}" — please confirm this is correct.`);
+      } else {
+        setStyleMismatchWarning("");
+      }
+    } else {
+      setStyleMismatchWarning("");
+    }
+  }, [detectedStyle, styleConfidence, patternType, material]);
+
   // ── Submit Registration ───────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +271,8 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
         body: JSON.stringify({
           weaverName, weaverAge, weaverBio, village, cooperative,
           material, daysOfLabor, price, patternType,
-          colors, weaverPhoto, referencePhoto: referenceFingerprint
+          colors, weaverPhoto, referencePhoto: referenceFingerprint,
+          detectedStyle, styleConfidence, styleNotes
         }),
       });
 
@@ -250,84 +327,140 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
 
       {/* Registration Form — Left */}
       <div className="lg:col-span-7 bg-[#f9f8f4] border border-[#1a1a1a]/15 rounded-none p-6 md:p-8 shadow-xs flex flex-col h-full">
-        <div className="flex items-center gap-3.5 border-b border-[#1a1a1a]/10 pb-5 mb-6">
-          <div>
-            <h3 className="font-serif text-xl font-bold text-[#1a1a1a]">Artisan Cooperative Registrar</h3>
-            <p className="text-[11px] text-[#1a1a1a]/60 font-sans uppercase tracking-wider mt-0.5">
-              Securely register handwoven garments and generate uncopiable thread fingerprints
-            </p>
+        
+        {/* Top Header & Toggle */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1a1a1a]/10 pb-5 mb-6">
+          <div className="flex items-center gap-3.5">
+            <span className="text-[9px] font-sans font-bold tracking-widest text-[#b45309] bg-[#b45309]/5 border border-[#b45309]/20 px-3 py-1.5 rounded-none uppercase">
+              {t("register.badge")}
+            </span>
+            <h3 className="font-serif text-xl font-bold text-[#1a1a1a]">{t("register.title")}</h3>
+          </div>
+          
+          <div className="flex bg-[#e5e5e5] p-1 rounded-full border border-[#1a1a1a]/10">
+            <button 
+              type="button" 
+              onClick={() => setRegistrationMode("web")}
+              className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${registrationMode === "web" ? "bg-white shadow-sm text-[#1a1a1a]" : "text-[#1a1a1a]/50 hover:text-[#1a1a1a]"}`}
+            >
+              {t("register.tab.web")}
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setRegistrationMode("whatsapp")}
+              className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${registrationMode === "whatsapp" ? "bg-[#25D366] shadow-sm text-white" : "text-[#1a1a1a]/50 hover:text-[#1a1a1a]"}`}
+            >
+              {t("register.tab.whatsapp")}
+            </button>
           </div>
         </div>
 
+        {registrationMode === "whatsapp" ? (
+          <div className="flex-1 flex flex-col">
+            <WhatsAppSimulator onRegister={(saree) => {
+              setIsRegistering(true);
+              fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(saree),
+              })
+                .then(res => res.json())
+                .then(newSaree => {
+                  const completedSaree = { ...newSaree, referencePhoto: saree.referencePhoto, weaverPhoto: saree.weaverPhoto };
+                  setRegisteredSaree(completedSaree);
+                  onRegisterSuccess(completedSaree);
+                })
+                .catch(err => {
+                  console.error(err);
+                  alert("Error registering via WhatsApp. Please try again.");
+                })
+                .finally(() => setIsRegistering(false));
+            }} />
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-5 flex-1 flex flex-col">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Weaver Name *</label>
+          <div className="space-y-5">
+            <h4 className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] border-b border-[#1a1a1a]/10 pb-2">
+              {t("register.artisanInfo")}
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.name")} *</label>
+                <input type="text" required
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={weaverName} onChange={(e) => setWeaverName(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.headshot")}</label>
+                <label className="w-full h-[42px] flex items-center justify-center bg-white border border-[#1a1a1a]/20 cursor-pointer hover:bg-stone-50 transition-colors">
+                  {weaverPhoto ? <Check className="h-4 w-4 text-green-600" /> : <User className="h-4 w-4 text-[#1a1a1a]/50" />}
+                  <span className="ml-2 text-xs font-serif text-[#1a1a1a]/70">{weaverPhoto ? t("register.uploaded") : t("register.upload")}</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleWeaverPhotoUpload} />
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.village")} *</label>
+                <input type="text" required
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={village} onChange={(e) => setVillage(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.coop")} *</label>
+                <input type="text" required
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={cooperative} onChange={(e) => setCooperative(e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-5 mt-8">
+            <h4 className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] border-b border-[#1a1a1a]/10 pb-2">
+              {t("register.garmentInfo")}
+            </h4>
+
+            <div>
+              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.pattern")} *</label>
               <input type="text" required
                 className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={weaverName} onChange={(e) => setWeaverName(e.target.value)} />
+                value={patternType} onChange={(e) => setPatternType(e.target.value)} />
             </div>
-            <div>
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Headshot Photo</label>
-              <label className="w-full h-[42px] flex items-center justify-center bg-white border border-[#1a1a1a]/20 cursor-pointer hover:bg-stone-50 transition-colors">
-                {weaverPhoto ? <Check className="h-4 w-4 text-green-600" /> : <User className="h-4 w-4 text-[#1a1a1a]/50" />}
-                <span className="ml-2 text-xs font-serif text-[#1a1a1a]/70">{weaverPhoto ? "Uploaded" : "Upload"}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleWeaverPhotoUpload} />
-              </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="md:col-span-1">
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.material")}</label>
+                <input type="text"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={material} onChange={(e) => setMaterial(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.labor")}</label>
+                <input type="number"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={daysOfLabor} onChange={(e) => setDaysOfLabor(Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.price")}</label>
+                <input type="number"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+              </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Weaving Village/Cluster *</label>
-              <input type="text" required
-                className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={village} onChange={(e) => setVillage(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Cooperative Society *</label>
-              <input type="text" required
-                className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={cooperative} onChange={(e) => setCooperative(e.target.value)} />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Garment / Pattern Name *</label>
-            <input type="text" required
-              className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-              value={patternType} onChange={(e) => setPatternType(e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="md:col-span-1">
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Material Blend</label>
-              <input type="text"
-                className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={material} onChange={(e) => setMaterial(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Days of Labor</label>
-              <input type="number"
-                className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={daysOfLabor} onChange={(e) => setDaysOfLabor(Number(e.target.value))} />
-            </div>
-            <div>
-              <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">Fair Trade Value (₹)</label>
-              <input type="number"
-                className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-            </div>
-          </div>
-
-          {/* Advanced Color Picker */}
+          
           <div className="bg-white p-5 rounded-none border border-[#1a1a1a]/15 mt-5">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]">Garment Color Palette</h4>
+              <h4 className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]">{t("register.color")}</h4>
             </div>
             
             {/* Active Colors */}
             <div className="flex flex-wrap gap-2 mb-4">
+              {colors.length === 0 && (
+                <span className="text-[10px] text-[#1a1a1a]/50 italic font-serif">No colors selected</span>
+              )}
               {colors.map((c, idx) => (
                 <div key={idx} className="flex items-center gap-1.5 bg-[#f9f8f4] border border-[#1a1a1a]/15 pl-1.5 pr-1 py-1 rounded-none">
                   <div className="w-4 h-4 border border-[#1a1a1a]/20" style={{ backgroundColor: c }}></div>
@@ -339,20 +472,53 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
 
             {/* Input for Manual Entry */}
             <div className="flex gap-2 relative">
-              <input type="text" placeholder="Enter color name (e.g. red) or #hexcode"
+              <input type="text" placeholder={t("register.color.placeholder")}
                 className="flex-1 text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] font-mono"
-                value={colorInput} onChange={handleColorInputChange} />
+                value={colorInput} onChange={handleColorInputChange} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleColorAdd();
+                  }
+                }}
+              />
+              <button 
+                type="button" 
+                onClick={handleColorAdd}
+                className="bg-[#1a1a1a] hover:bg-[#b45309] text-white px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+              >
+                {t("register.color.add")} +
+              </button>
+            </div>
+
+            {/* Traditional Themes */}
+            <div className="mt-6 border-t border-[#1a1a1a]/10 pt-4">
+              <p className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/60 mb-3">{t("register.color.traditional")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => applyTheme(["#dca820", "#800000"])} className="text-left text-[10px] font-sans font-bold text-[#1a1a1a] p-2 border border-[#1a1a1a]/15 hover:bg-[#1a1a1a]/5 flex items-center justify-between">
+                  {t("register.color.kanchi")} <div className="flex"><div className="w-2 h-2 bg-[#dca820]"></div><div className="w-2 h-2 bg-[#800000]"></div></div>
+                </button>
+                <button type="button" onClick={() => applyTheme(["#000000", "#e32636"])} className="text-left text-[10px] font-sans font-bold text-[#1a1a1a] p-2 border border-[#1a1a1a]/15 hover:bg-[#1a1a1a]/5 flex items-center justify-between">
+                  {t("register.color.bandhani")} <div className="flex"><div className="w-2 h-2 bg-[#000000]"></div><div className="w-2 h-2 bg-[#e32636]"></div></div>
+                </button>
+                <button type="button" onClick={() => applyTheme(["#ffffff", "#d4af37"])} className="text-left text-[10px] font-sans font-bold text-[#1a1a1a] p-2 border border-[#1a1a1a]/15 hover:bg-[#1a1a1a]/5 flex items-center justify-between">
+                  {t("register.color.kasavu")} <div className="flex"><div className="w-2 h-2 border border-black/10 bg-[#ffffff]"></div><div className="w-2 h-2 bg-[#d4af37]"></div></div>
+                </button>
+                <button type="button" onClick={() => applyTheme(["#ffc107", "#dc143c"])} className="text-left text-[10px] font-sans font-bold text-[#1a1a1a] p-2 border border-[#1a1a1a]/15 hover:bg-[#1a1a1a]/5 flex items-center justify-between">
+                  {t("register.color.phulkari")} <div className="flex"><div className="w-2 h-2 bg-[#ffc107]"></div><div className="w-2 h-2 bg-[#dc143c]"></div></div>
+                </button>
+              </div>
             </div>
 
             {/* Suggested Shades */}
             {suggestedShades.length > 0 && (
               <div className="mt-3 p-3 bg-stone-50 border border-stone-200">
-                <span className="block text-[9px] font-sans uppercase tracking-wider text-[#1a1a1a]/50 mb-2">Select a shade:</span>
-                <div className="flex gap-2">
-                  {suggestedShades.map((shade, idx) => (
-                    <button key={idx} type="button" onClick={() => addShade(shade)}
-                      className="w-8 h-8 rounded-none border border-black/10 hover:border-black hover:scale-110 transition-all cursor-pointer shadow-sm"
-                      style={{ backgroundColor: shade }} title={shade}
+                <p className="text-[10px] uppercase font-bold text-[#1a1a1a]/50 mb-2">Palette Suggestions</p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedShades.map(s => (
+                    <button key={s} type="button" onClick={() => { setColorInput(s); setColors([...colors, s]); setSuggestedShades([]); }}
+                      className="w-6 h-6 rounded-none border border-stone-300 shadow-sm hover:scale-110 transition-transform"
+                      style={{ backgroundColor: s }} title={s}
                     />
                   ))}
                 </div>
@@ -379,11 +545,25 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
             </div>
           </div>
 
+          {isClassifyingStyle && (
+            <div className="mt-4 text-[10px] text-amber-600 font-sans uppercase tracking-widest font-bold animate-pulse">
+              AI is analyzing weaving style...
+            </div>
+          )}
+          
+          {styleMismatchWarning && !isClassifyingStyle && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-500/30 text-amber-900 text-xs font-serif flex items-start gap-2">
+              <span className="text-[10px] uppercase font-bold font-sans tracking-wider text-amber-600 shrink-0">AI Notice:</span>
+              <span>{styleMismatchWarning}</span>
+            </div>
+          )}
+
           <button type="submit" disabled={isRegistering || cameraActive || !referenceFingerprint}
             className="w-full mt-auto bg-[#1a1a1a] hover:bg-[#b45309] text-white font-sans font-bold text-xs uppercase tracking-[0.2em] py-3.5 px-4 rounded-none border border-[#1a1a1a] transition-all disabled:opacity-50 shadow-xs">
-            {isRegistering ? "Uploading structural fingerprint..." : "Register Saree & Generate Certificate"}
+            {isRegistering ? "Uploading structural fingerprint..." : t("register.submit")}
           </button>
         </form>
+        )}
       </div>
 
       {/* Right Panel */}
@@ -392,7 +572,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
         {/* Live Camera OR Upload Monitor */}
         <div className="bg-[#1a1a1a] text-white rounded-none p-6 border border-[#1a1a1a] flex flex-col items-center text-center">
           <span className="text-[10px] font-sans tracking-[0.2em] text-[#b45309] font-bold uppercase mb-4">
-            MASTER FINGERPRINT CAPTURE (MANDATORY)
+            {t("register.fingerprint")}
           </span>
 
           {cameraActive ? (
@@ -411,8 +591,8 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
               
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/70 backdrop-blur-sm flex gap-2">
                 <button onClick={capturePhoto} type="button"
-                  className="flex-1 bg-[#b45309] hover:bg-[#d97706] text-white font-sans font-bold text-xs uppercase tracking-wider py-2.5 px-3 rounded-none flex items-center justify-center gap-2 transition-colors border border-[#d97706]">
-                  <Camera className="h-4 w-4" /> Capture Macro
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#1a1a1a] text-white py-2 px-3 text-xs uppercase tracking-wider font-bold border border-[#1a1a1a] hover:bg-[#1a1a1a]/90 transition-colors rounded-none">
+                  <Camera className="h-4 w-4" /> {t("register.capture")}
                 </button>
                 <button onClick={stopCamera} type="button"
                   className="bg-white/10 hover:bg-white/20 text-white font-sans font-bold text-xs uppercase tracking-wider py-2.5 px-3 rounded-none flex items-center justify-center transition-colors border border-white/20">
@@ -432,7 +612,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                     </div>
                   </>
                 ) : (
-                  <div className="text-stone-500 text-xs font-mono text-center px-4">Camera capture or macro photo upload required</div>
+                  <div className="text-stone-500 text-xs font-mono text-center px-4">{t("register.cameraRequired")}</div>
                 )}
 
                 {/* Hover overlay to retake */}
@@ -451,7 +631,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                   <Camera className="h-3.5 w-3.5" /> Use Camera
                 </button>
                 <label className="flex-1 bg-white/10 hover:bg-white/20 text-white font-sans font-bold text-[10px] uppercase tracking-wider py-2.5 px-3 border border-white/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
-                  <Upload className="h-3.5 w-3.5" /> Upload Photo
+                  <Upload className="h-3.5 w-3.5" /> {t("register.upload")}
                   <input type="file" accept="image/*" className="hidden" onChange={handleFingerprintUpload} />
                 </label>
               </div>
@@ -568,9 +748,9 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
         ) : (
           <div className="bg-white border border-[#1a1a1a]/15 rounded-none p-8 flex flex-col items-center justify-center text-center flex-1 min-h-[250px]">
             <FileCheck className="h-10 w-10 text-[#1a1a1a]/40 stroke-[1.5] mb-3" />
-            <p className="font-serif text-[#1a1a1a] font-bold text-base">Awaiting Registration</p>
+            <p className="font-serif text-[#1a1a1a] font-bold text-base">{t("register.awaiting")}</p>
             <p className="text-xs text-[#1a1a1a]/60 mt-1 max-w-xs leading-relaxed font-serif">
-              Fill out the artisan form, capture the master fingerprint, and click &quot;Register Saree&quot; to compile your structural fingerprint and print certificates.
+              {t("register.awaitingDesc")}
             </p>
           </div>
         )}

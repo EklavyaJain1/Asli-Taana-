@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import { AlertCircle, Fingerprint } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowRight, ShieldCheck, Factory, PlayCircle, Fingerprint, RefreshCw, AlertCircle } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface Saree {
   id: string;
@@ -29,7 +30,7 @@ interface ConceptSectionProps {
 }
 
 export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
-  // Removed unused stats variables
+  const { t } = useLanguage();
 
   return (
     <div className="bg-[#f9f8f4] border border-[#1a1a1a]/15 rounded-none p-6 md:p-10 shadow-xs">
@@ -37,16 +38,23 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
         
         {/* Pitch Headline */}
         <div className="text-center mb-10 md:mb-14">
-          <span className="text-[10px] font-sans tracking-[0.25em] text-[#b45309] uppercase bg-[#b45309]/5 px-3 py-1 rounded-none border border-[#b45309]/20 font-bold">
-            HACKATHON THEME CONTEXT
-          </span>
-          <h2 className="font-serif text-3xl md:text-5xl text-[#1a1a1a] mt-4 font-normal tracking-tight leading-tight">
-            The Weave Fingerprint: <span className="italic font-normal">Solving the Powerloom Cheat</span>
-          </h2>
-          <div className="h-px w-20 bg-[#1a1a1a]/20 mx-auto my-5"></div>
-          <p className="text-[#1a1a1a]/80 font-serif text-lg leading-relaxed max-w-2xl mx-auto">
-            Every piece of cloth woven by hand contains an uncopiable structural signature. 
-            We protect the livelihood of traditional artisans by scanning what machines can never fake.
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#1a1a1a] text-[#f5f5f5] mb-6 rounded-none">
+            <span className="h-2 w-2 rounded-full bg-[#b45309] animate-pulse"></span>
+            <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em]">{t("concept.badge")}</span>
+          </div>
+
+          <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold text-[#1a1a1a] tracking-tight mb-6 text-center">
+            <span className="block font-serif italic text-3xl md:text-4xl lg:text-5xl text-[#1a1a1a]/60 mb-2">
+              {t("concept.title1")}
+            </span>
+            {t("concept.title2")}
+            <span className="block font-serif italic text-3xl md:text-4xl lg:text-5xl text-[#1a1a1a]/60 mt-2">
+              {t("concept.title3")}
+            </span>
+          </h1>
+
+          <p className="text-base md:text-lg text-[#1a1a1a]/70 max-w-xl mx-auto font-serif leading-relaxed mb-8 text-center">
+            {t("concept.desc")}
           </p>
         </div>
 
@@ -60,26 +68,25 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
               <div className="bg-red-50 p-2 rounded-none border border-red-200">
                 <AlertCircle className="h-5 w-5" />
               </div>
-              <h3 className="font-serif text-xl font-bold text-[#1a1a1a]">The Powerloom Threat</h3>
+              <h3 className="font-serif text-xl font-bold text-[#1a1a1a]">{t("concept.problem.title")}</h3>
             </div>
             
             <p className="text-[#1a1a1a]/80 text-sm font-serif leading-relaxed mb-6">
-              In famous villages like <strong>Kuthampully</strong>, over 100 shops claim to sell authentic handloom sarees. 
-              In reality, only <strong>one cooperative</strong> still weaves by hand. The rest are cheap powerloom copies.
+              {t("concept.problem.desc")}
             </p>
 
             <ul className="space-y-4 text-xs md:text-sm text-[#1a1a1a]/80">
               <li className="flex items-start gap-3">
                 <span className="text-red-700 font-bold">01.</span>
-                <span className="font-sans leading-relaxed"><strong>Replication Speed:</strong> A machine copies handwoven patterns in minutes; a real weaver spends days, thread by thread.</span>
+                <span className="font-sans leading-relaxed"><strong>{t("concept.problem.point1.title")}</strong> {t("concept.problem.point1.desc")}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-red-700 font-bold">02.</span>
-                <span className="font-sans leading-relaxed"><strong>Price Undercutting:</strong> Authentic sarees cost ₹12,000+ to compensate skilled labor, but fakes sell for under ₹2,000.</span>
+                <span className="font-sans leading-relaxed"><strong>{t("concept.problem.point2.title")}</strong> {t("concept.problem.point2.desc")}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-red-700 font-bold">03.</span>
-                <span className="font-sans leading-relaxed"><strong>Law Enforcement Gap:</strong> The 1985 Handloom Act bans powerloom replication, but inspectors cannot visually tell the difference.</span>
+                <span className="font-sans leading-relaxed"><strong>{t("concept.problem.point3.title")}</strong> {t("concept.problem.point3.desc")}</span>
               </li>
             </ul>
           </div>
@@ -91,26 +98,25 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
                 <div className="bg-white/5 p-2 rounded-none border border-white/15">
                   <Fingerprint className="h-5 w-5 text-[#b45309]" />
                 </div>
-                <h3 className="font-serif text-xl font-bold text-white">The Organic Fingerprint</h3>
+                <h3 className="font-serif text-xl font-bold text-white">{t("concept.solution.title")}</h3>
               </div>
 
               <p className="text-white/80 text-sm font-serif leading-relaxed mb-6">
-                A human weaver naturally creates microscopic irregularities—varying thread tension, tiny gaps, and occasional slubs. 
-                These micro-irregularities form a <strong>uniquely uncopiable cloth fingerprint</strong>.
+                {t("concept.solution.desc")}
               </p>
 
               <ul className="space-y-4 text-xs md:text-sm text-white/80">
                 <li className="flex items-start gap-3">
                   <span className="text-[#b45309] font-bold">01.</span>
-                  <span className="font-sans leading-relaxed"><strong>Uncopiable Code:</strong> If a fake seller duplicates a QR label, the shopper's fresh macro-photo of the weave will still mismatch the registry.</span>
+                  <span className="font-sans leading-relaxed"><strong>{t("concept.solution.point1.title")}</strong> {t("concept.solution.point1.desc")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-[#b45309] font-bold">02.</span>
-                  <span className="font-sans leading-relaxed"><strong>Zero Equipment:</strong> Cooperative offices register items with a macro-lens. Shoppers authenticate instantly using native smartphone cameras.</span>
+                  <span className="font-sans leading-relaxed"><strong>{t("concept.solution.point2.title")}</strong> {t("concept.solution.point2.desc")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-[#b45309] font-bold">03.</span>
-                  <span className="font-sans leading-relaxed"><strong>Artisan Protection:</strong> Redirects market capital to actual craftsmen, driving a fair economy and cultural preservation.</span>
+                  <span className="font-sans leading-relaxed"><strong>{t("concept.solution.point3.title")}</strong> {t("concept.solution.point3.desc")}</span>
                 </li>
               </ul>
             </div>
@@ -121,8 +127,8 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
         {/* Visual Fingerprint Demonstration */}
         <div className="bg-white border border-[#1a1a1a]/15 rounded-none p-6 md:p-8 mb-8">
           <div className="text-center mb-8">
-            <span className="text-[9px] font-sans uppercase tracking-[0.2em] text-[#1a1a1a]/60">Microscopic Magnification Comparison</span>
-            <h4 className="font-serif text-xl text-[#1a1a1a] mt-1 font-semibold">Comparing Weave Fingerprints</h4>
+            <span className="text-[9px] font-sans uppercase tracking-[0.2em] text-[#1a1a1a]/60">{t("concept.fingerprint.badge")}</span>
+            <h4 className="font-serif text-xl text-[#1a1a1a] mt-1 font-semibold">{t("concept.fingerprint.title")}</h4>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -149,12 +155,12 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
 
                 {/* Hand symbol */}
                 <span className="absolute bottom-1 right-2 text-[9px] uppercase tracking-wider bg-[#b45309] text-white font-sans px-1.5 py-0.5 rounded-none font-bold">
-                  Organic
+                  {t("concept.fingerprint.organic")}
                 </span>
               </div>
-              <p className="font-serif text-sm font-bold text-[#1a1a1a]">A. Handwoven Thread &quot;Fingerprint&quot;</p>
+              <p className="font-serif text-sm font-bold text-[#1a1a1a]">{t("concept.fingerprint.handwoven.title")}</p>
               <p className="text-xs text-[#1a1a1a]/60 text-center mt-2 max-w-xs leading-relaxed">
-                Tiny random waves and thread variations (slubs) happen naturally. No two spots are identical.
+                {t("concept.fingerprint.handwoven.desc")}
               </p>
             </div>
 
@@ -180,15 +186,14 @@ export default function ConceptSection({ sarees = [] }: ConceptSectionProps) {
 
                 {/* Machine symbol */}
                 <span className="absolute bottom-1 right-2 text-[9px] uppercase tracking-wider bg-red-800 text-white font-sans px-1.5 py-0.5 rounded-none font-bold">
-                  Machine
+                  {t("concept.fingerprint.machine")}
                 </span>
               </div>
-              <p className="font-serif text-sm font-bold text-[#1a1a1a]">B. Powerloom Repeating Pattern</p>
+              <p className="font-serif text-sm font-bold text-[#1a1a1a]">{t("concept.fingerprint.machine.title")}</p>
               <p className="text-xs text-[#1a1a1a]/60 text-center mt-2 max-w-xs leading-relaxed">
-                Perfect repeating pattern. A machine copies the grid flawlessly, making fakes easily detectable by AI comparison.
+                {t("concept.fingerprint.machine.desc")}
               </p>
             </div>
-
           </div>
 
           <div className="mt-8 p-5 bg-[#f9f8f4] border border-[#1a1a1a]/10 rounded-none flex flex-col sm:flex-row items-baseline gap-4">

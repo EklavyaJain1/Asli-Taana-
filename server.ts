@@ -155,6 +155,9 @@ app.post("/api/register", (req, res) => {
     colors,
     weaverPhoto,
     referencePhoto,
+    detectedStyle,
+    styleConfidence,
+    styleNotes,
   } = req.body;
 
   if (!weaverName || !village || !cooperative || !material) {
@@ -179,6 +182,9 @@ app.post("/api/register", (req, res) => {
     colors: colors || ["#f5f5f5", "#ffd700"],
     weaverPhoto: weaverPhoto || "",
     referencePhoto: referencePhoto || "",
+    detectedStyle,
+    styleConfidence: Number(styleConfidence) || 0,
+    styleNotes,
   };
 
   registeredSarees.unshift(newSaree);
@@ -186,7 +192,73 @@ app.post("/api/register", (req, res) => {
   res.status(201).json(newSaree);
 });
 
-// 4. AI-Powered Verification
+// 4. AI Style Classification (for registration)
+app.post("/api/classify-style", async (req, res) => {
+  const { referencePhoto } = req.body;
+  if (!referencePhoto) {
+    return res.status(400).json({ error: "Reference photo is required." });
+  }
+
+  const cleanBase64 = (base64Str: string) => base64Str.replace(/^data:image\/\w+;base64,/, "");
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+  if (!openRouterKey || openRouterKey === "MY_OPENROUTER_API_KEY") {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return res.json({
+      detectedStyle: "Kanchipuram Silk (Temple Border)",
+      styleConfidence: 92,
+      styleNotes: "Simulated detection based on heavy zari border and solid contrasting color blocks typical of Kanchipuram styles."
+    });
+  }
+
+  try {
+    const prompt = `You are a master handloom textile expert. Analyze the provided macro photograph of a fabric weave.
+Identify the visual weaving style/motif (e.g. Kanchipuram, Paithani, Banarasi, Ikat, Chanderi, Bandhani, Kasavu, or "Unidentified/Other").
+Provide a confidence score (0-100) and a brief 1-2 sentence explanation of the visual cues you used (e.g., motif type, border pattern, zari usage).
+
+You MUST respond strictly in the following JSON format. Do not write any markdown, do not include any text before or after the JSON.
+{
+  "detectedStyle": "string",
+  "styleConfidence": number,
+  "styleNotes": "string"
+}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Asli Taana"
+      },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cleanBase64(referencePhoto)}` } }
+            ]
+          }
+        ]
+      })
+    });
+
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+
+    let resultText = json.choices[0].message.content || "{}";
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const resultJson = JSON.parse(resultText);
+    res.json(resultJson);
+  } catch (err: any) {
+    console.error("OpenRouter style classification failed: ", err);
+    res.status(500).json({ error: "Style classification failed." });
+  }
+});
+
+// 5. AI-Powered Verification
 app.post("/api/verify", async (req, res) => {
   const { sareeId, referencePhoto, shopperPhoto, scanType, weaverName } = req.body;
 
@@ -221,6 +293,9 @@ app.post("/api/verify", async (req, res) => {
             "The border pattern intersections and horizontal transitions line up perfectly with a minor 1.2-degree angle correction applied.",
         },
         recommendation: `✅ Genuine Handloom. Fabric authenticated as woven by ${weaverName || "the registered artisan"}.`,
+        detectedStyle: "Kanchipuram Silk",
+        styleConfidence: 94,
+        styleNotes: "Visible dense temple border jacquard weaving with pure zari, consistent with Kanchipuram techniques."
       });
     } else if (scanType === "powerloom") {
       return res.json({
@@ -237,6 +312,9 @@ app.post("/api/verify", async (req, res) => {
             "A perfect geometric repetition signature is present, confirming this is a machine-made copy (powerloom fake) exploiting a duplicated sticker.",
         },
         recommendation: `❌ Mismatch. This piece is a machine-made powerloom imitation! It does not match the registered handwoven fingerprint.`,
+        detectedStyle: "Powerloom Replica (Kanchipuram Style)",
+        styleConfidence: 98,
+        styleNotes: "The motif mimics a Kanchipuram border, but the absolute mathematical grid and lack of slubs indicates machine automation."
       });
     } else {
       return res.json({
@@ -253,6 +331,9 @@ app.post("/api/verify", async (req, res) => {
             "Completely unrelated visual pattern. This is either a mismatched item or a counterfeit tag.",
         },
         recommendation: `❌ Mismatch. The cloth weave does not match the registered item.`,
+        detectedStyle: "Unidentified/Other",
+        styleConfidence: 45,
+        styleNotes: "The visual pattern is completely different from the registered item, lacking specific identifiable traditional motifs."
       });
     }
   }
@@ -280,7 +361,10 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
     "threadTension": "Analysis of human-tension organic variations (handloom) vs mathematically perfect spacing (powerloom).",
     "patternAlignment": "Analysis of pattern coordinates, color transitions, and camera tilt correction."
   },
-  "recommendation": "A friendly authenticating statement or warning, mentioning the weaver name (${weaverName || "registered weaver"})."
+  "recommendation": "A friendly authenticating statement or warning, mentioning the weaver name (${weaverName || "registered weaver"}).",
+  "detectedStyle": "The visual weaving style/motif identified from the images (e.g. Kanchipuram Silk, Paithani, Ikat, etc.)",
+  "styleConfidence": "Number between 0-100",
+  "styleNotes": "1-2 sentences explaining the visual cues (motif type, border pattern, zari) used to identify the style"
 }`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -292,7 +376,7 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
         "X-Title": "Asli Taana"
       },
       body: JSON.stringify({
-        model: "nvidia/nemotron-nano-12b-v2-vl:free",
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
         messages: [
           {
             role: "user",
@@ -309,8 +393,9 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
     const json = await response.json();
     if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
 
-    const resultText = json.choices[0].message.content || "{}";
-    const resultJson = JSON.parse(resultText.trim());
+    let resultText = json.choices[0].message.content || "{}";
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const resultJson = JSON.parse(resultText);
     res.json({ isDemoFallback: false, ...resultJson });
   } catch (err: any) {
     console.error("OpenRouter API call failed: ", err);

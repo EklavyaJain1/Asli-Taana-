@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface HeaderProps {
   navItems?: { name: string; url: string; icon: any }[];
@@ -14,6 +15,7 @@ interface HeaderProps {
 
 export default function Header({ navItems, activeItem, onChange }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
   return (
     <header className="bg-[#f9f8f4] text-[#1a1a1a] border-b border-[#1a1a1a]/15 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
@@ -22,20 +24,32 @@ export default function Header({ navItems, activeItem, onChange }: HeaderProps) 
           {/* Logo & Branding */}
           <div className="flex items-center gap-3 sm:gap-4">
             <img src="/logo.png" alt="Asli Taana Logo" className="h-12 sm:h-16 w-auto object-contain" />
-            <span className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[#1a1a1a]">Asli Taana</span>
+            <span className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[#1a1a1a]">
+              {t("app.title")}
+            </span>
           </div>
 
-          {/* Mobile Burger Menu Button */}
-          {navItems && navItems.length > 0 && (
-            <div className="sm:hidden flex items-center">
-              <button 
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-                className="p-2 text-[#1a1a1a] border border-[#1a1a1a]/10 rounded-none bg-white shadow-xs"
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Language Toggle */}
+            <button 
+              onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
+              className="px-3 py-1.5 text-[10px] md:text-xs font-sans font-bold uppercase tracking-widest border border-[#1a1a1a]/20 bg-white hover:bg-[#1a1a1a]/5 transition-colors rounded-none text-[#1a1a1a]"
+            >
+              {language === 'en' ? 'हिन्दी' : 'EN'}
+            </button>
+
+            {/* Mobile Burger Menu Button */}
+            {navItems && navItems.length > 0 && (
+              <div className="sm:hidden flex items-center">
+                <button 
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+                  className="p-2 text-[#1a1a1a] border border-[#1a1a1a]/10 rounded-none bg-white shadow-xs"
+                >
+                  {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </div>
+            )}
+          </div>
 
         </div>
       </div>
