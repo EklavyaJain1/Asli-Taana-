@@ -578,6 +578,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
       <div className="lg:col-span-5 flex flex-col gap-6">
 
         {/* Live Camera OR Upload Monitor */}
+        {registrationMode !== "whatsapp" && (
         <div className="bg-[#1a1a1a] text-white rounded-none p-6 border border-[#1a1a1a] flex flex-col items-center text-center">
           <span className="text-[10px] font-sans tracking-[0.2em] text-[#b45309] font-bold uppercase mb-4">
             {t("register.fingerprint")}
@@ -658,6 +659,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
              </p>
           )}
         </div>
+        )}
 
         {/* Certificate output */}
         {registeredSaree ? (

@@ -205,13 +205,13 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
         </div>
 
         {/* Input Area */}
-        <div className="absolute bottom-4 left-4 right-4 flex gap-2">
-          <div className="flex-1 bg-white rounded-full flex items-center px-4 py-2 shadow-sm">
-            <span className="text-xl mr-2">😊</span>
+        <div className="absolute bottom-4 left-2 right-2 flex gap-1.5 items-end">
+          <div className="flex-1 bg-white rounded-3xl flex items-center px-3 py-2.5 shadow-sm min-w-0">
+            <span className="text-xl shrink-0 mr-1.5">😊</span>
             <input 
               type="text" 
               placeholder={t("whatsapp.placeholder")}
-              className="flex-1 outline-none text-[15px] bg-transparent"
+              className="w-full min-w-0 flex-1 outline-none text-[15px] bg-transparent"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
@@ -219,19 +219,28 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
             />
             
             {step === 6 ? (
-              <label className="cursor-pointer text-gray-500 hover:text-gray-700 ml-2">
-                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                <Camera className="w-5 h-5" />
-              </label>
+              <div className="flex items-center gap-3 ml-2 shrink-0 relative z-50">
+                <label htmlFor="bot-attach-file" className="cursor-pointer text-gray-500 hover:text-gray-700 p-1" title="Attach file">
+                  <input id="bot-attach-file" type="file" accept="image/*" className="sr-only" onChange={handlePhotoUpload} />
+                  <Paperclip className="w-5 h-5 pointer-events-none" />
+                </label>
+                <label htmlFor="bot-attach-camera" className="cursor-pointer text-gray-500 hover:text-gray-700 p-1" title="Take photo">
+                  <input id="bot-attach-camera" type="file" accept="image/*" capture="environment" className="sr-only" onChange={handlePhotoUpload} />
+                  <Camera className="w-5 h-5 pointer-events-none" />
+                </label>
+              </div>
             ) : (
-              <Paperclip className="w-5 h-5 text-gray-500 ml-2" />
+              <div className="flex items-center gap-3 ml-2 shrink-0">
+                <Paperclip className="w-5 h-5 text-gray-300" />
+                <Camera className="w-5 h-5 text-gray-300" />
+              </div>
             )}
           </div>
           
           <button 
             onClick={handleSend}
             disabled={!inputValue.trim() && step !== 6}
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm shrink-0 transition-colors ${
+            className={`w-[46px] h-[46px] rounded-full flex items-center justify-center shadow-sm shrink-0 transition-colors ${
               (inputValue.trim() || step === 6) ? "bg-[#075e54] text-white" : "bg-[#075e54]/50 text-white"
             }`}
           >
