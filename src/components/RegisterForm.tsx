@@ -188,6 +188,14 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
     setCameraActive(false);
   }, []);
 
+  // Set video source after the video element mounts (which happens when cameraActive becomes true)
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [cameraActive]);
+
   useEffect(() => () => stopCamera(), [stopCamera]);
 
   const capturePhoto = () => {

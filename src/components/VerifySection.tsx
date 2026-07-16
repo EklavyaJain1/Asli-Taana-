@@ -177,6 +177,14 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
     setCameraActive(false);
   }, []);
 
+  // Set video source after the video element mounts (which happens when cameraActive becomes true)
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [cameraActive]);
+
   // Stop camera on unmount
   useEffect(() => () => stopCamera(), [stopCamera]);
 
