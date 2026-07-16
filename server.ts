@@ -405,6 +405,96 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
   }
 });
 
+// 6. Fabric Identity Classification (Independent feature)
+app.post("/api/identify-fabric", async (req, res) => {
+  const { image } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ error: "Fabric image is required." });
+  }
+
+  const cleanBase64 = (base64Str: string) => base64Str.replace(/^data:image\/\w+;base64,/, "");
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+  if (!openRouterKey || openRouterKey === "MY_OPENROUTER_API_KEY") {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const fallbackMapPath = path.join(process.cwd(), "data", "craft-origin-map.json");
+    let mapData: any = {};
+    if (fs.existsSync(fallbackMapPath)) {
+      mapData = JSON.parse(fs.readFileSync(fallbackMapPath, "utf-8"));
+    }
+    const mockFiber = "silk";
+    const fiberInfo = mapData[mockFiber] || { description: "Simulated silk", grown_in: [], woven_in: [] };
+    
+    return res.json({
+      fiber_type: mockFiber,
+      weave_pattern: "twill",
+      confidence: 95,
+      visible_indicators: ["smooth sheen", "fine thread thickness"],
+      originData: fiberInfo
+    });
+  }
+
+  try {
+    const prompt = `You are a textile fiber classifier for a handloom authentication app.
+Given this fabric image, identify:
+1. fiber_type: one of [cotton, silk, wool, linen, synthetic_blend, tussar_silk, muga_silk, other]
+2. weave_pattern: one of [plain_weave, twill, jacquard, jamdani, ikat, unknown]
+3. confidence: 0-100
+4. visible_indicators: 1-2 short phrases on visual cues (sheen, texture, thread thickness)
+Respond ONLY in this JSON format, no extra text:
+{"fiber_type": "", "weave_pattern": "", "confidence": 0, "visible_indicators": []}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Asli Taana"
+      },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cleanBase64(image)}` } }
+            ]
+          }
+        ]
+      })
+    });
+
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+
+    let resultText = json.choices[0].message.content || "{}";
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const aiResult = JSON.parse(resultText);
+
+    // Look up knowledge base
+    const mapPath = path.join(process.cwd(), "data", "craft-origin-map.json");
+    let originData = null;
+    if (fs.existsSync(mapPath)) {
+      const mapContent = fs.readFileSync(mapPath, "utf-8");
+      const craftMap = JSON.parse(mapContent);
+      if (aiResult.fiber_type && craftMap[aiResult.fiber_type]) {
+        originData = craftMap[aiResult.fiber_type];
+      }
+    }
+
+    res.json({
+      ...aiResult,
+      originData
+    });
+  } catch (err: any) {
+    console.error("OpenRouter fabric identification failed: ", err);
+    res.status(500).json({ error: "Fabric identification failed.", details: err.message });
+  }
+});
+
 // ── Vite / Static Serving ─────────────────────────────────────────────────────
 async function startServer() {
   if (process.env.VERCEL) {

@@ -10,6 +10,7 @@ import {
   ShieldAlert, ShieldCheck, Loader2, Upload, Eye, EyeOff,
   Camera, CameraOff, RefreshCw, X, User
 } from "lucide-react";
+import FabricIdentityCard from "./FabricIdentityCard";
 
 interface Saree {
   id: string;
@@ -506,6 +507,9 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
             </div>
           </div>
         )}
+
+        {/* Fabric Identity Feature */}
+        <FabricIdentityCard shopperPhoto={shopperPhoto} selectedSaree={selectedSaree} />
 
         {/* Verification Result */}
         {verificationResult && !isVerifying && (

@@ -1,0 +1,37 @@
+{
+  "cotton": {
+    "description": "A soft, fluffy staple fiber that grows in a boll around the seeds of the cotton plants. It provides a breathable, comfortable fabric heavily used in daily wear.",
+    "grown_in": ["Gujarat", "Maharashtra", "Telangana", "Andhra Pradesh", "Madhya Pradesh"],
+    "woven_in": ["Chettinad", "Mangalagiri", "Kota", "Kuthampully", "Chanderi"]
+  },
+  "silk": {
+    "description": "A natural protein fiber produced by silkworms, known for its high luster, strength, and luxurious feel. It is a staple of premium festive wear.",
+    "grown_in": ["Karnataka", "Andhra Pradesh", "Tamil Nadu", "West Bengal", "Jammu & Kashmir"],
+    "woven_in": ["Kanchipuram", "Varanasi (Banaras)", "Mysore", "Dharmavaram", "Paithan"]
+  },
+  "wool": {
+    "description": "A textile fiber obtained from sheep and other animals, offering excellent insulation and warmth for colder climates.",
+    "grown_in": ["Rajasthan", "Jammu & Kashmir", "Himachal Pradesh", "Uttarakhand", "Gujarat"],
+    "woven_in": ["Kullu", "Pashmina (Kashmir)", "Bhujodi", "Amritsar"]
+  },
+  "linen": {
+    "description": "A textile made from the fibers of the flax plant, known for its exceptional coolness and freshness in hot and humid weather.",
+    "grown_in": ["Imported (Europe)", "Himachal Pradesh (limited)"],
+    "woven_in": ["Bhagalpur", "Phulia", "Surat"]
+  },
+  "synthetic_blend": {
+    "description": "A mix of natural fibers and man-made synthetic fibers like polyester or nylon. It often mimics natural fabrics but is cheaper and more durable.",
+    "grown_in": ["Industrial synthesis (Gujarat, Maharashtra)"],
+    "woven_in": ["Surat", "Bhilwara", "Ludhiana"]
+  },
+  "tussar_silk": {
+    "description": "Also known as wild silk, produced by silkworms that feed on trees like Sal and Arjun. It has a rich texture, natural dull gold sheen, and distinct uneven feel.",
+    "grown_in": ["Jharkhand", "Chhattisgarh", "Odisha", "Maharashtra", "West Bengal"],
+    "woven_in": ["Bhagalpur", "Champa", "Gopalpur", "Bishnupur"]
+  },
+  "muga_silk": {
+    "description": "A rare, wild silk unique to Assam, renowned for its naturally yellowish-golden tint and extreme durability that outlasts the wearer.",
+    "grown_in": ["Assam", "Meghalaya"],
+    "woven_in": ["Sualkuchi", "Guwahati"]
+  }
+}
