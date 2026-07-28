@@ -28,7 +28,10 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
   const [weaverData, setWeaverData] = useState<any>({});
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const parent = messagesEndRef.current?.parentElement;
+    if (parent) {
+      parent.scrollTo({ top: parent.scrollHeight, behavior: "smooth" });
+    }
   };
 
   useEffect(() => {

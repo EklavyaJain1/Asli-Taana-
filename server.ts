@@ -8,7 +8,7 @@ import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
-
+import twilio from "twilio";
 
 // Load .env.local first, then .env as fallback
 dotenv.config({ path: ".env.local" });
@@ -19,6 +19,7 @@ const PORT = 3000;
 
 // Enable parsing of large base64 payloads
 app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // ── File-Based Database ──────────────────────────────────────────────────────
 const DB_PATH = process.env.VERCEL 
@@ -493,6 +494,132 @@ Respond ONLY in this JSON format, no extra text:
     console.error("OpenRouter fabric identification failed: ", err);
     res.status(500).json({ error: "Fabric identification failed.", details: err.message });
   }
+});
+
+// ── WhatsApp Integration (Twilio) ─────────────────────────────────────────────
+
+// In-memory session state for WhatsApp users
+const whatsappSessions: Record<string, { step: number; data: any }> = {};
+
+const WHATSAPP_QUESTIONS = [
+  "Great! Let's start with your name. What is your full name?",
+  "What Is Your Phone Number?",
+  "Now, could you send a clear photo of yourself (a simple selfie or headshot works)? This will appear on your weaver profile so buyers can see the person behind the craft.",
+  "Which village or town are you weaving in?",
+  "Which district is that in?",
+  "And which state?",
+  "What's the PIN code of your area?",
+  "What handloom style or craft do you weave? (e.g. Kanchipuram, Paithani, Banarasi, Chanderi, Jamdani, or your own regional style)",
+  "How many years have you been weaving?",
+  "What type of Material did you use?",
+  "Are you part of a weaving cooperative or society? If yes, share its name. If not, type SKIP.",
+  "What do you mainly weave? (e.g. saree, dupatta, stole, fabric by the metre)",
+  "Now please send one clear photo of a sample of your fabric/product — this is different from your headshot above, and helps us verify your craft and build your Fabric Identity Card.",
+  "To receive payments for orders through Asli Taana, please share your UPI ID or bank account number. You can type SKIP and add this later.",
+  "For verification, please share your Aadhaar number or Weaver ID card number. This is kept private and only used to confirm your identity. Type SKIP to complete this at the offline verification stage instead.",
+  "Last step! Do you agree to let Asli Taana store your details and display your name, photo, craft, and story (not your private ID/payment info) on your product's digital Fabric Identity Card? Reply YES or NO."
+];
+
+app.post("/api/whatsapp/webhook", async (req, res) => {
+  const { Body, From, NumMedia, MediaUrl0 } = req.body;
+  const twiml = new twilio.twiml.MessagingResponse();
+
+  if (!whatsappSessions[From]) {
+    whatsappSessions[From] = { step: 0, data: {} };
+  }
+  const session = whatsappSessions[From];
+
+  try {
+    const text = Body ? Body.trim() : "";
+
+    // Image Upload Steps (Step 2 and Step 12)
+    if (session.step === 3 || session.step === 13) {
+      if (NumMedia && parseInt(NumMedia) > 0) {
+        const imageRes = await fetch(MediaUrl0);
+        const arrayBuffer = await imageRes.arrayBuffer();
+        const base64Image = Buffer.from(arrayBuffer).toString('base64');
+        
+        if (session.step === 3) {
+          session.data.headshot_photo = `data:image/jpeg;base64,${base64Image}`;
+        } else {
+          session.data.fabric_sample_photo = `data:image/jpeg;base64,${base64Image}`;
+        }
+      } else {
+        twiml.message("Please send a photo to continue.");
+        res.writeHead(200, { 'Content-Type': 'text/xml' });
+        return res.end(twiml.toString());
+      }
+    } else if (session.step > 0) {
+      // Text Steps
+      switch (session.step) {
+        case 1: session.data.full_name = text; break;
+        case 2: session.data.mobile_number = text; break;
+        case 4: session.data.village_town = text; break;
+        case 5: session.data.district = text; break;
+        case 6: session.data.state = text; break;
+        case 7: session.data.pin_code = text; break;
+        case 8: session.data.weaving_style = text; break;
+        case 9: session.data.years_experience = text; break;
+        case 10: session.data.Material_Type = text; break;
+        case 11: session.data.cooperative_society = text; break;
+        case 12: session.data.product_type = text; break;
+        case 14: session.data.bank_upi_id = text; break;
+        case 15: session.data.id_proof_number = text; break;
+        case 16: session.data.consent = text; break;
+      }
+    }
+
+    if (session.step === 16) {
+      // Registration complete, process data
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString(16).toUpperCase();
+      const id = `AT-2026-${randomSuffix}`;
+
+      const newSaree = {
+        id,
+        weaverName: session.data.full_name || "Unknown",
+        mobile_number: session.data.mobile_number || From,
+        weaverAge: 45,
+        years_experience: Number(session.data.years_experience) || 0,
+        weaverBio: `A weaver from ${session.data.village_town}, ${session.data.district}, ${session.data.state}.`,
+        village: session.data.village_town,
+        district: session.data.district,
+        state: session.data.state,
+        pin_code: session.data.pin_code,
+        cooperative: session.data.cooperative_society,
+        material: session.data.Material_Type,
+        product_type: session.data.product_type,
+        bank_upi_id: session.data.bank_upi_id,
+        id_proof_number: session.data.id_proof_number,
+        consent: session.data.consent,
+        daysOfLabor: 10,
+        price: 0, // Not asked in new flow
+        patternType: session.data.weaving_style,
+        registeredDate: new Date().toISOString().split("T")[0],
+        colors: ["#f5f5f5", "#ffd700"],
+        weaverPhoto: session.data.headshot_photo || "",
+        referencePhoto: session.data.fabric_sample_photo || "",
+        detectedStyle: session.data.weaving_style || "WhatsApp Registration",
+        styleConfidence: 100,
+        styleNotes: "Registered manually via WhatsApp.",
+      };
+
+      registeredSarees.unshift(newSaree);
+      saveDatabase(registeredSarees);
+
+      twiml.message("🎉 Thank you! Your registration is submitted. Our team will verify your details and assign your unique QR Tag ID. You'll get a message here once it's ready. Namaste!");
+      delete whatsappSessions[From]; // Reset session
+    } else {
+      twiml.message(WHATSAPP_QUESTIONS[session.step]);
+      session.step++;
+    }
+  } catch (err) {
+    console.error("WhatsApp Webhook Error:", err);
+    twiml.message("Sorry, something went wrong. Please try again.");
+    delete whatsappSessions[From];
+  }
+
+  res.writeHead(200, { 'Content-Type': 'text/xml' });
+  res.end(twiml.toString());
 });
 
 // ── Vite / Static Serving ─────────────────────────────────────────────────────
