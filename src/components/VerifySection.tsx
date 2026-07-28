@@ -37,9 +37,10 @@ interface Saree {
 interface VerifySectionProps {
   sarees: Saree[];
   currentSareeId?: string;
+  isLocked?: boolean;
 }
 
-export default function VerifySection({ sarees, currentSareeId }: VerifySectionProps) {
+export default function VerifySection({ sarees, currentSareeId, isLocked = false }: VerifySectionProps) {
   const { t } = useLanguage();
   const [selectedSareeId, setSelectedSareeId] = useState("");
   const [selectedSaree, setSelectedSaree] = useState<Saree | null>(null);
@@ -264,11 +265,15 @@ export default function VerifySection({ sarees, currentSareeId }: VerifySectionP
           <h3 className="font-serif text-xl font-bold text-[#1a1a1a] mt-5 mb-4">{t("verify.title1")}</h3>
 
           <div className="mb-4">
-            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/60 mb-1.5">{t("verify.active")}</label>
+            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]/60 mb-1.5">
+              {t("verify.active")} 
+              {isLocked && <span className="ml-2 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Scanned via QR Code</span>}
+            </label>
             <select
-              className="w-full border border-[#1a1a1a]/20 p-2.5 rounded-none bg-white font-mono text-sm text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] shadow-inner"
+              className={`w-full border border-[#1a1a1a]/20 p-2.5 rounded-none font-mono text-sm focus:outline-none focus:border-[#1a1a1a] shadow-inner ${isLocked ? "bg-stone-100 text-stone-500 cursor-not-allowed opacity-80" : "bg-white text-[#1a1a1a]"}`}
               value={selectedSareeId}
               onChange={(e) => setSelectedSareeId(e.target.value)}
+              disabled={isLocked}
             >
               <option value="" disabled>{t("verify.active.placeholder")}</option>
               {sarees.map(s => (

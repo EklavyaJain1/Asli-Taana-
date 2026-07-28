@@ -41,6 +41,7 @@ export default function App() {
   const [selectedSareeId, setSelectedSareeId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isAppLoading, setIsAppLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
   const { t } = useLanguage();
 
   // ── URL Deep Linking ──────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export default function App() {
     if (id) {
       setSelectedSareeId(id);
       setActiveTab("verify");
+      setIsLocked(true);
       // Clean the URL without reloading the page
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -165,7 +167,7 @@ export default function App() {
               )
             )}
             {activeTab === "verify" && (
-              <VerifySection sarees={sarees} currentSareeId={selectedSareeId} />
+              <VerifySection sarees={sarees} currentSareeId={selectedSareeId} isLocked={isLocked} />
             )}
 
           </motion.div>
