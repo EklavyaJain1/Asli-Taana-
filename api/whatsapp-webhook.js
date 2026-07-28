@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 const QUESTIONS = [
   { key: 'full_name', question: "Great! Let's start with your name. What is your full name?", type: 'text' },
@@ -36,7 +36,7 @@ function createTwiML(message) {
   return twiml.toString();
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
@@ -105,4 +105,4 @@ module.exports = async (req, res) => {
   const twiml = createTwiML(nextQuestion.question);
   res.set('Content-Type', 'text/xml');
   res.send(twiml);
-};
+}
