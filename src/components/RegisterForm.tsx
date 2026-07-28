@@ -6,10 +6,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Clipboard, Check, Printer, Layers, FileCheck, QrCode, Download,
-  Camera, X, Upload, Image as ImageIcon, User, Plus
+  Camera, X, Upload, Image as ImageIcon, User, Plus, FileText
 } from "lucide-react";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { useLanguage } from "../contexts/LanguageContext";
 import WhatsAppSimulator from "./WhatsAppSimulator";
 
@@ -49,6 +50,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
   const [weaverName, setWeaverName] = useState("Rajendra Prasad");
   const [weaverAge, setWeaverAge] = useState(45);
   const [weaverBio, setWeaverBio] = useState("A skilled cotton and silk weaver preserving traditional jacquard techniques passed down through 4 generations.");
+  const [weaverAgeError, setWeaverAgeError] = useState("");
   const [village, setVillage] = useState("Chanderi");
   const [cooperative, setCooperative] = useState("Chanderi Handloom Weavers Union");
   const [material, setMaterial] = useState("Silk");
@@ -99,14 +101,7 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
   useEffect(() => {
     if (!registeredSaree?.id) return;
     
-    const qrData = JSON.stringify({
-      id: registeredSaree.id,
-      weaver: registeredSaree.weaverName,
-      type: registeredSaree.patternType,
-      date: registeredSaree.registeredDate,
-      price: registeredSaree.price,
-      url: `${window.location.origin}/?id=${registeredSaree.id}`
-    });
+    const qrData = `${window.location.origin}/?id=${registeredSaree.id}`;
 
     QRCode.toDataURL(qrData, {
       width: 200,
@@ -330,6 +325,25 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
     a.click();
   };
 
+  const handleDownloadQRPDF = async () => {
+    if (!qrCodeDataUrl || !registeredSaree) return;
+    try {
+      const pdf = new jsPDF();
+      pdf.setFontSize(18);
+      pdf.text("Asli Taana - Verification QR", 105, 20, { align: "center" });
+      pdf.setFontSize(12);
+      pdf.text(`Saree ID: ${registeredSaree.id}`, 105, 30, { align: "center" });
+      pdf.text(`Weaver: ${registeredSaree.weaverName}`, 105, 38, { align: "center" });
+      pdf.addImage(qrCodeDataUrl, "PNG", 60, 50, 90, 90);
+      pdf.setFontSize(10);
+      pdf.text("Scan this QR for verification", 105, 150, { align: "center" });
+      pdf.save(`AsliTaana-QR-${registeredSaree.id}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate QR PDF", err);
+      alert("Failed to download QR PDF.");
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
@@ -400,6 +414,16 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                   value={weaverName} onChange={(e) => setWeaverName(e.target.value)} />
               </div>
               <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.age")} *</label>
+                <input type="number" required min="18" max="100"
+                  className={`w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif ${weaverAgeError ? "border-red-500" : ""}`}
+                  value={weaverAge} onChange={(e) => { setWeaverAge(Number(e.target.value)); setWeaverAgeError(""); }} />
+                {weaverAgeError && <p className="text-[10px] text-red-500 mt-1 font-sans">{weaverAgeError}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-4">
+              <div>
                 <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.headshot")}</label>
                 <label className="w-full h-[42px] flex items-center justify-center bg-white border border-[#1a1a1a]/20 cursor-pointer hover:bg-stone-50 transition-colors">
                   {weaverPhoto ? <Check className="h-4 w-4 text-green-600" /> : <User className="h-4 w-4 text-[#1a1a1a]/50" />}
@@ -407,9 +431,6 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                   <input type="file" accept="image/*" className="hidden" onChange={handleWeaverPhotoUpload} />
                 </label>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.village")} *</label>
                 <input type="text" required
@@ -669,6 +690,10 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                 className="text-[10px] bg-[#1a1a1a] text-white hover:bg-[#b45309] px-3 py-2 rounded-none border border-[#1a1a1a] uppercase tracking-wider font-sans font-bold transition-colors flex items-center gap-1 shadow-xs">
                 <Download className="h-3.5 w-3.5" /> Download Certificate Image
               </button>
+              <button onClick={handleDownloadQRPDF} type="button"
+                className="text-[10px] bg-[#b45309] text-white hover:bg-[#1a1a1a] px-3 py-2 rounded-none border border-[#b45309] uppercase tracking-wider font-sans font-bold transition-colors flex items-center gap-1 shadow-xs">
+                <FileText className="h-3.5 w-3.5" /> Download QR PDF
+              </button>
               <button onClick={handlePrint} type="button"
                 className="text-[10px] bg-white text-[#1a1a1a] border border-[#1a1a1a]/20 hover:bg-stone-100 px-3 py-2 rounded-none uppercase tracking-wider font-sans font-bold transition-colors flex items-center gap-1 shadow-xs">
                 <Printer className="h-3.5 w-3.5" /> Print
@@ -728,15 +753,23 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                 </div>
 
                 {/* QR Code */}
-                <div className="w-[120px] shrink-0 border-l border-[#1a1a1a]/10 pl-4 flex flex-col items-center justify-center">
+                <div className="w-[140px] shrink-0 border-l border-[#1a1a1a]/10 pl-4 flex flex-col items-center justify-center">
                   {qrCodeDataUrl ? (
-                    <img src={qrCodeDataUrl} alt="QR Code" className="w-24 h-24 border border-[#1a1a1a]/10" />
+                    <img src={qrCodeDataUrl} alt="QR Code" className="w-28 h-28 border border-[#1a1a1a]/10" />
                   ) : (
-                    <div className="w-24 h-24 bg-stone-100 border border-[#1a1a1a]/10 flex items-center justify-center">
+                    <div className="w-28 h-28 bg-stone-100 border border-[#1a1a1a]/10 flex items-center justify-center">
                       <QrCode className="h-6 w-6 text-stone-300" />
                     </div>
                   )}
-                  <span className="text-[7px] text-[#1a1a1a]/60 uppercase tracking-widest font-bold mt-2 text-center w-full">Scan for Verified JSON Data</span>
+                  <span className="text-[7px] text-[#1a1a1a]/60 uppercase tracking-widest font-bold mt-2 text-center w-full">Scan this for verification</span>
+                  <a 
+                    href={`${window.location.origin}/?id=${registeredSaree.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[8px] text-[#b45309] hover:text-[#1a1a1a] font-sans font-bold uppercase tracking-wider mt-1 underline underline-offset-2"
+                  >
+                    Open Verification Page
+                  </a>
                 </div>
               </div>
 

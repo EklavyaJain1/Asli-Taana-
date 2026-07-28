@@ -8,8 +8,9 @@ import { generateFabricDataUrl } from "../utils/fabricGenerator";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   ShieldAlert, ShieldCheck, Loader2, Upload, Eye, EyeOff,
-  Camera, CameraOff, RefreshCw, X, User
+  Camera, CameraOff, RefreshCw, X, User, Download
 } from "lucide-react";
+import QRCode from "qrcode";
 import FabricIdentityCard from "./FabricIdentityCard";
 
 interface Saree {
@@ -54,6 +55,9 @@ export default function VerifySection({ sarees, currentSareeId, isLocked = false
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
   const [revealFingerprints, setRevealFingerprints] = useState(true);
 
+  // QR state
+  const [certificateQrUrl, setCertificateQrUrl] = useState<string>("");
+
   // Camera state
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string>("");
@@ -77,6 +81,18 @@ export default function VerifySection({ sarees, currentSareeId, isLocked = false
       setVerificationResult(null);
     }
   }, [selectedSareeId, sarees]);
+
+  // Generate certificate QR code when saree changes
+  useEffect(() => {
+    if (!selectedSaree?.id) return;
+    const pdfUrl = `${window.location.origin}/api/sarees/${selectedSaree.id}/certificate`;
+    QRCode.toDataURL(pdfUrl, {
+      width: 200,
+      margin: 1,
+      color: { dark: "#1a1a1a", light: "#ffffff" },
+      errorCorrectionLevel: "L",
+    }).then(setCertificateQrUrl).catch(console.error);
+  }, [selectedSaree]);
 
   // Generate fabric images when saree or scan type changes
   useEffect(() => {
@@ -376,6 +392,34 @@ export default function VerifySection({ sarees, currentSareeId, isLocked = false
                 <>Coordinate Seed: <span className="text-[#b45309] font-bold">{selectedSaree.seed}</span> (Handloom)</>
               )}
             </p>
+          </div>
+        )}
+
+        {/* Certificate QR Code */}
+        {selectedSaree && certificateQrUrl && (
+          <div className="bg-white border border-[#1a1a1a]/15 rounded-none p-5 shadow-xs flex flex-col items-center">
+            <span className="text-[9px] font-sans font-bold tracking-widest text-[#b45309] uppercase mb-3">
+              Certificate QR Code
+            </span>
+            <div className="relative h-40 w-40 rounded-none overflow-hidden border border-[#1a1a1a]/10 bg-white p-2">
+              <img src={certificateQrUrl} alt="Certificate QR" className="h-full w-full object-contain" />
+            </div>
+            <p className="text-[10px] text-[#1a1a1a]/60 mt-2 font-mono text-center leading-relaxed">
+              Scan to open / download certificate PDF<br />
+              <span className="text-[#b45309] font-bold">{selectedSaree.id}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const a = document.createElement("a");
+                a.href = certificateQrUrl;
+                a.download = `AsliTaana-QR-${selectedSaree.id}.png`;
+                a.click();
+              }}
+              className="mt-3 text-[10px] bg-[#1a1a1a] hover:bg-[#b45309] text-white font-sans font-bold uppercase tracking-wider px-4 py-2 rounded-none flex items-center gap-2 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Download QR PNG
+            </button>
           </div>
         )}
       </div>
