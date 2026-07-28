@@ -90,10 +90,12 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
       addBotMessage(botQuestions[nextStep].key);
     }
   };
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // When step reaches the end, trigger API call
   useEffect(() => {
-    if (step === 7 && !isTyping) {
+    if (step === 7 && !isTyping && !hasSubmitted) {
+      setHasSubmitted(true);
       // Chat is finished, submit data
       setTimeout(() => {
         onRegister({
@@ -111,8 +113,7 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
         });
       }, 2000);
     }
-  }, [step, isTyping, weaverData, onRegister]);
-
+  }, [step, isTyping, weaverData, onRegister, hasSubmitted]);
   // Handle mock photo upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
