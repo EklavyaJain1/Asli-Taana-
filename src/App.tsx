@@ -61,6 +61,11 @@ export default function App() {
   // Marketplace state: which product to price, which weaver for demand
   const [pricingProductId, setPricingProductId] = useState<string | undefined>();
   const [demandWeaverId, setDemandWeaverId] = useState<string | undefined>();
+  // Product opened directly from the Fair Trade Gallery — rendered as an
+  // in-place detail overlay so the nav STAYS on "store" (it does NOT switch
+  // to the invisible "pricing" tab, which previously made the nav jump to
+  // "Concept").
+  const [storeSelectedId, setStoreSelectedId] = useState<string | undefined>();
   const { products } = useMarketplace();
 
   // ── URL Deep Linking ──────────────────────────────────────────────────────
@@ -120,8 +125,16 @@ export default function App() {
   }, []);
 
   const handleStoreSelectProduct = useCallback((id: string) => {
+    // NOTE: we deliberately do NOT call setActiveTab here. Switching to the
+    // invisible "pricing" tab made the nav highlight fall back to "Concept".
+    // Instead we record the selection and let the Storefront render the
+    // PriceBreakdownView as an in-place overlay while the tab stays "store".
     setPricingProductId(id);
-    setActiveTab("pricing");
+    setStoreSelectedId(id);
+  }, []);
+
+  const handleStoreCloseProduct = useCallback(() => {
+    setStoreSelectedId(undefined);
   }, []);
 
   // ── Nav definition ────────────────────────────────────────────────────────
@@ -236,7 +249,12 @@ export default function App() {
               )
             )}
             {activeTab === "store" && (
-              <Storefront onSelectProduct={handleStoreSelectProduct} />
+              <Storefront
+                onSelectProduct={handleStoreSelectProduct}
+                selectedProductId={storeSelectedId}
+                onCloseProduct={handleStoreCloseProduct}
+                onPublished={handlePublished}
+              />
             )}
             {activeTab === "demand" && (
               <DemandDashboard weaverId={demandWeaverId} />

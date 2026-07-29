@@ -151,25 +151,25 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
    * 
    * At later steps, mic works as simple single-answer voice input.
    */
-  const handleMicClick = () => {
-    if (isListening) return;
-    
+  // Core recognition routine. `lang` forces a locale (used for the
+  // step-0 English fallback). Unlike handleMicClick it does NOT check
+  // isListening, so it can be re-invoked for the fallback pass.
+  const runRecognition = (lang: string) => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert(botLang === "hi" ? "आपका ब्राउज़र वॉयस इनपुट का समर्थन नहीं करता है।" : "Your browser does not support voice input.");
       return;
     }
-    
+
     const recognition = new SpeechRecognition();
-    // At step 0 we don't know language yet, so listen in both 
-    recognition.lang = step === 0 ? "hi-IN" : (botLang === "hi" ? "hi-IN" : "en-US");
+    recognition.lang = lang;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     // Allow longer speech at the greeting step
     recognition.continuous = step === 0;
-    
+
     let fullTranscript = "";
-    
+
     recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event: any) => {
       // Accumulate all results for continuous mode
@@ -178,23 +178,47 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
           fullTranscript += (fullTranscript ? " " : "") + event.results[i][0].transcript;
         }
       }
-      if (step === 0) {
-        // Don't set inputValue yet — we'll process the full transcript on end
-        setInputValue(fullTranscript);
-      } else {
-        setInputValue(fullTranscript || event.results[0][0].transcript);
-      }
+      setInputValue(fullTranscript || (event.results[0] && event.results[0][0] ? event.results[0][0].transcript : ""));
     };
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => {
       setIsListening(false);
-      // At step 0, if we got substantial speech, auto-process it
-      if (step === 0 && fullTranscript.split(" ").length >= 5) {
-        handleVoiceBulkInput(fullTranscript);
+      const wordCount = fullTranscript.split(" ").filter(Boolean).length;
+
+      if (step === 0) {
+        const hasHindi = /[\u0900-\u097F]/.test(fullTranscript);
+        // Step 0 defaults to hi-IN. If that pass picked up almost nothing
+        // and no Devanagari, the user probably spoke English — retry in en-US
+        // so English speakers get the same auto-send as Hindi speakers.
+        if (lang === "hi-IN" && wordCount < 5 && !hasHindi) {
+          runRecognition("en-US");
+          return;
+        }
+        if (wordCount >= 5) {
+          // Long speech → extract all fields at once
+          handleVoiceBulkInput(fullTranscript);
+        } else if (fullTranscript.trim()) {
+          // Short speech (e.g. "1" / "English") → auto-send to pick language
+          const t = fullTranscript.trim();
+          setInputValue(t);
+          setTimeout(() => handleSend(t), 350);
+        }
+      } else if (fullTranscript.trim()) {
+        // Any later step → auto-send the recognised speech (Hindi & English),
+        // so the user never has to press the send button.
+        const t = fullTranscript.trim();
+        setInputValue(t);
+        setTimeout(() => handleSend(t), 350);
       }
     };
-    
+
     recognition.start();
+  };
+
+  const handleMicClick = () => {
+    if (isListening) return;
+    const initialLang = step === 0 ? "hi-IN" : (botLang === "hi" ? "hi-IN" : "en-US");
+    runRecognition(initialLang);
   };
 
   /**
@@ -355,28 +379,31 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     return { isValid: answer.trim().length > 1, reason: "Please provide a valid answer." };
   };
 
-  const handleSend = async () => {
+  const handleSend = async (overrideValue?: string) => {
     const isPhotoStep = step === 4 || step === 14;
-    if (!inputValue.trim() && !isPhotoStep) return;
+    // Accept an explicit value so callers (e.g. voice onend) can send
+    // immediately without waiting for React state to flush.
+    const value = (overrideValue ?? inputValue).trim();
+    if (!value && !isPhotoStep) return;
 
     const currentField = botFlow[step].field;
-    
+
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: "user",
-      text: inputValue
+      text: value
     };
-    
+
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
-    
+
     // ── Step 0: Language selection or short text input ──
     if (step === 0) {
-      const lower = inputValue.toLowerCase();
+      const lower = value.toLowerCase();
       let selectedLang: "en" | "hi" = "en";
 
       // Detect language from the typed/spoken input
-      const hindiChars = (inputValue.match(/[\u0900-\u097F]/g) || []).length;
+      const hindiChars = (value.match(/[\u0900-\u097F]/g) || []).length;
       const hindiKeywords = /mera|naam|hai|hoon|gaon|saal|hindi|हिंदी/i.test(lower);
 
       if (lower.includes("2") || lower.includes("hindi") || lower.includes("हिंदी") || hindiChars > 3 || hindiKeywords) {
@@ -385,9 +412,9 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
       setBotLang(selectedLang);
 
       // Check if the input contains substantial info (more than just "1" or "English")
-      if (inputValue.trim().split(" ").length >= 5) {
+      if (value.split(" ").length >= 5) {
         // They typed/spoke a lot — treat as bulk voice input
-        handleVoiceBulkInput(inputValue.trim());
+        handleVoiceBulkInput(value);
         return;
       }
 
@@ -401,13 +428,13 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     setIsTyping(true);
 
     const questionText = botFlow[step][botLang];
-    const validation = await validateAnswer(questionText, inputValue);
+    const validation = await validateAnswer(questionText, value);
 
     setIsValidating(false);
 
     if (validation.isValid) {
       // Save data
-      const newData = { ...weaverData, [currentField]: inputValue };
+      const newData = { ...weaverData, [currentField]: value };
       setWeaverData(newData);
 
       // ── Smart skip: find next UNANSWERED step ──
@@ -417,17 +444,17 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
         nextStep++;
       }
       setStep(nextStep);
-      
+
       if (nextStep < botFlow.length) {
         addBotMessage(botFlow[nextStep][botLang]);
       }
     } else {
       setIsTyping(false);
       // Ask again
-      const errorMsg = botLang === "hi" 
+      const errorMsg = botLang === "hi"
         ? `क्षमा करें, यह सही नहीं लग रहा है। (${validation.reason || "कृपया सही उत्तर दें"}) कृपया पुनः प्रयास करें।`
         : `Sorry, that doesn't seem right. (${validation.reason || "Please provide a valid answer."}) Please try again.`;
-      
+
       setMessages((prev) => [...prev, { id: Date.now().toString(), sender: "bot", text: errorMsg, isError: true }]);
     }
   };
