@@ -341,6 +341,137 @@ Reply strictly with a JSON object in this format:
   }
 });
 
+// 3.6 AI Voice Data Extraction — parses free-form weaver speech into structured fields
+// and auto-detects which language the weaver spoke in (en/hi).
+app.post("/api/extract-voice-data", async (req, res) => {
+  const { transcript } = req.body;
+  if (!transcript || !transcript.trim()) {
+    return res.status(400).json({ error: "Transcript is required." });
+  }
+
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+  // ─── Fields the bot collects ───
+  const FIELDS = [
+    "full_name", "mobile_number", "age", "village_town", "district",
+    "state", "pin_code", "weaving_style", "years_experience",
+    "material_type", "cooperative_society", "product_type",
+    "bank_upi_id", "id_proof_number"
+  ];
+
+  if (!openRouterKey || openRouterKey === "MY_OPENROUTER_API_KEY") {
+    // ─── Mock fallback: best-effort regex extraction ───
+    await new Promise((r) => setTimeout(r, 600));
+
+    const extracted: Record<string, string> = {};
+    const t = transcript;
+
+    // Simple heuristic extraction for demo
+    const nameMatch = t.match(/(?:my name is|mera naam|naam)\s+(.+?)(?:\.|,|$)/i);
+    if (nameMatch) extracted.full_name = nameMatch[1].trim();
+
+    const phoneMatch = t.match(/(\d{10})/);
+    if (phoneMatch) extracted.mobile_number = phoneMatch[1];
+
+    const ageMatch = t.match(/(?:age|umar|umr)\s*(?:is|hai|h)?\s*(\d{1,3})/i);
+    if (ageMatch) extracted.age = ageMatch[1];
+
+    const villageMatch = t.match(/(?:village|gaon|gaaon|town)\s*(?:is|hai|se|se hoon)?\s*(.+?)(?:\.|,|$)/i);
+    if (villageMatch) extracted.village_town = villageMatch[1].trim();
+
+    const stateMatch = t.match(/(?:state|rajya)\s*(?:is|hai)?\s*(.+?)(?:\.|,|$)/i);
+    if (stateMatch) extracted.state = stateMatch[1].trim();
+
+    const expMatch = t.match(/(\d{1,2})\s*(?:years?|saal|sal)/i);
+    if (expMatch) extracted.years_experience = expMatch[1];
+
+    const styleMatch = t.match(/(?:banarasi|kanchipuram|paithani|chanderi|jamdani|ikat|patola|pochampally|tussar|muga|kasavu|sambalpuri|maheshwari)/i);
+    if (styleMatch) extracted.weaving_style = styleMatch[0];
+
+    const materialMatch = t.match(/(?:silk|cotton|wool|jute|linen|resham|reshmi|suti|cotton-silk)/i);
+    if (materialMatch) extracted.material_type = materialMatch[0];
+
+    const productMatch = t.match(/(?:saree|sari|dupatta|stole|shawl|fabric|lungi|dhoti|gamcha)/i);
+    if (productMatch) extracted.product_type = productMatch[0];
+
+    // Detect language
+    const hindiChars = (t.match(/[\u0900-\u097F]/g) || []).length;
+    const hindiKeywords = /mera|naam|hai|hoon|gaon|saal|se|banta|banata|bunai|karta/i.test(t);
+    const detectedLang = (hindiChars > 5 || hindiKeywords) ? "hi" : "en";
+
+    return res.json({ extracted, detectedLang, fieldsFound: Object.keys(extracted) });
+  }
+
+  try {
+    const prompt = `You are a smart assistant for Asli Taana, a handloom weaver registration platform.
+
+A weaver just spoke into a microphone. Below is their speech transcript. Extract as many of the following registration fields as you can find in the text. Only include fields you are confident about. Do NOT guess or fabricate data.
+
+Fields to extract:
+- full_name: The weaver's full name
+- mobile_number: 10-digit Indian phone number
+- age: Numeric age
+- village_town: Village or town name
+- district: District name
+- state: Indian state name
+- pin_code: 6-digit PIN code
+- weaving_style: Handloom style (e.g. Banarasi, Kanchipuram, Paithani, Chanderi, Jamdani, etc.)
+- years_experience: How many years they have been weaving (just the number)
+- material_type: Material used (silk, cotton, wool, etc.)
+- cooperative_society: Name of cooperative, or "NO" if they said they're independent
+- product_type: What they mainly weave (saree, dupatta, stole, etc.)
+- bank_upi_id: UPI ID or bank account
+- id_proof_number: Aadhaar number or Weaver ID
+
+Also detect the PRIMARY language the weaver spoke in. Return "hi" for Hindi/Hinglish, "en" for English.
+
+Weaver's speech transcript:
+"${transcript}"
+
+Reply ONLY with a valid JSON object in this exact format (no markdown, no explanation):
+{
+  "extracted": { ... only fields you found ... },
+  "detectedLang": "en" or "hi",
+  "fieldsFound": ["field1", "field2", ...]
+}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Asli Taana"
+      },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        messages: [{ role: "user", content: [{ type: "text", text: prompt }] }]
+      })
+    });
+
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+
+    let contentStr = json.choices[0].message.content;
+    contentStr = contentStr.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    try {
+      const parsed = JSON.parse(contentStr);
+      res.json({
+        extracted: parsed.extracted || {},
+        detectedLang: parsed.detectedLang || "en",
+        fieldsFound: parsed.fieldsFound || Object.keys(parsed.extracted || {})
+      });
+    } catch {
+      // Best-effort: return empty
+      res.json({ extracted: {}, detectedLang: "en", fieldsFound: [] });
+    }
+  } catch (err: any) {
+    console.error("Voice Extraction Error:", err);
+    res.status(500).json({ error: "Failed to extract voice data." });
+  }
+});
+
 // 4. AI Style Classification (for registration)
 app.post("/api/classify-style", async (req, res) => {
   const { referencePhoto } = req.body;
@@ -404,6 +535,73 @@ You MUST respond strictly in the following JSON format. Do not write any markdow
   } catch (err: any) {
     console.error("OpenRouter style classification failed: ", err);
     res.status(500).json({ error: "Style classification failed." });
+  }
+});
+
+// 4.5 AI Product Suggestion (Module 1 photo-first onboarding)
+// Given a product photo, suggests a human-readable title, category and material
+// so a low-literacy weaver can accept with one tap instead of typing.
+app.post("/api/suggest-product", async (req, res) => {
+  const { photo } = req.body;
+  if (!photo) {
+    return res.status(400).json({ error: "Product photo is required." });
+  }
+
+  const cleanBase64 = (base64Str: string) => base64Str.replace(/^data:image\/\w+;base64,/, "");
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+  // High-fidelity fallback (deterministic-ish) when no key is configured.
+  if (!openRouterKey || openRouterKey === "MY_OPENROUTER_API_KEY") {
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    return res.json({
+      title: "Handwoven Silk Saree with Zari Border",
+      category: "Saree",
+      material: "Mulberry silk with zari",
+      confidence: 88,
+      isMock: true,
+    });
+  }
+
+  try {
+    const prompt = `You help rural handloom weavers list products with minimal typing.
+Given this product photo, suggest a short, sellable product title (max 8 words), a single product category, and the likely material.
+Categories must be one of: Saree, Stole, Dupatta, Fabric, Shawl, Duppata, Other.
+
+Respond ONLY in this JSON format, no markdown, no extra text:
+{"title": "", "category": "", "material": "", "confidence": 0}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Asli Taana"
+      },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cleanBase64(photo)}` } }
+            ]
+          }
+        ]
+      })
+    });
+
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+
+    let resultText = json.choices[0].message.content || "{}";
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const resultJson = JSON.parse(resultText);
+    res.json({ isMock: false, ...resultJson });
+  } catch (err: any) {
+    console.error("OpenRouter product suggestion failed: ", err);
+    res.status(500).json({ error: "Product suggestion failed.", details: err.message });
   }
 });
 

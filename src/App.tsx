@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import ConceptSection from "./components/ConceptSection";
@@ -11,11 +11,25 @@ import RegisterForm from "./components/RegisterForm";
 import VerifySection from "./components/VerifySection";
 import SareeList from "./components/SareeList";
 import LoadingScreen from "./components/LoadingScreen";
-import { NavBar } from "./components/ui/tubelight-navbar";
-import { Info, Layers, ListFilter, ShieldCheck, Heart } from "lucide-react";
+import { SlideTabs } from "./components/ui/slide-tabs";
+import {
+  Info, Layers, ListFilter, ShieldCheck, Heart,
+  UserPlus, Store, TrendingUp, BookOpen,
+} from "lucide-react";
 import { useLanguage } from "./contexts/LanguageContext";
 
-type Tab = "concept" | "register" | "registry" | "verify";
+// Marketplace module imports (Modules 1–3)
+import OnboardingFlow from "./components/marketplace/OnboardingFlow";
+import VillageAssistant from "./components/marketplace/VillageAssistant";
+import PriceBreakdownView from "./components/marketplace/PriceBreakdownView";
+import DemandDashboard from "./components/marketplace/DemandDashboard";
+import Storefront from "./components/marketplace/Storefront";
+import AboutPanel from "./components/marketplace/AboutPanel";
+import { useMarketplace } from "./marketplace/useMarketplaceStore";
+
+type Tab =
+  | "concept" | "register" | "registry" | "verify"
+  | "village" | "pricing" | "store" | "demand";
 
 interface Saree {
   id: string;
@@ -44,6 +58,11 @@ export default function App() {
   const [isLocked, setIsLocked] = useState(false);
   const { t } = useLanguage();
 
+  // Marketplace state: which product to price, which weaver for demand
+  const [pricingProductId, setPricingProductId] = useState<string | undefined>();
+  const [demandWeaverId, setDemandWeaverId] = useState<string | undefined>();
+  const { products } = useMarketplace();
+
   // ── URL Deep Linking ──────────────────────────────────────────────────────
   // When opening via QR code: ?id=AT-2026-XXXX → auto-select saree & go to verify
   useEffect(() => {
@@ -53,7 +72,6 @@ export default function App() {
       setSelectedSareeId(id);
       setActiveTab("verify");
       setIsLocked(true);
-      // Clean the URL without reloading the page
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -73,7 +91,6 @@ export default function App() {
       setIsLoading(false);
     }
   };
-
   useEffect(() => { fetchSarees(); }, []);
 
   const handleNewRegistration = (newSaree: any) => {
@@ -87,32 +104,61 @@ export default function App() {
     setActiveTab("verify");
   };
 
-  const navItems = [
+  // ── Module flow callbacks ──
+  const handleOnboardComplete = useCallback((weaverId: string, productId: string) => {
+    setPricingProductId(productId);
+    setDemandWeaverId(weaverId);
+    setActiveTab("pricing");
+  }, []);
+
+  const handlePublished = useCallback(() => {
+    setActiveTab("store");
+  }, []);
+
+  const handleViewStore = useCallback(() => {
+    setActiveTab("store");
+  }, []);
+
+  const handleStoreSelectProduct = useCallback((id: string) => {
+    setPricingProductId(id);
+    setActiveTab("pricing");
+  }, []);
+
+  // ── Nav definition ────────────────────────────────────────────────────────
+  // Grouped: original tabs (top) + marketplace tabs (bottom)
+  const originalNavItems = [
     { name: "Concept", key: "concept", url: "#concept", icon: Info },
     { name: "Registration", key: "register", url: "#register", icon: Layers },
     { name: "Live Registry", key: "registry", url: "#registry", icon: ListFilter },
     { name: "Verification", key: "verify", url: "#verify", icon: ShieldCheck },
   ];
-  
-  const translatedNavItems = navItems.map(item => ({
+  const marketplaceNavItems = [
+    { name: "Fair Trade Gallery", key: "store", url: "#store", icon: Store },
+    { name: "Demand", key: "demand", url: "#demand", icon: TrendingUp },
+  ];
+  const allNavItems = [...originalNavItems, ...marketplaceNavItems];
+
+  const translatedNavItems = allNavItems.map((item) => ({
     ...item,
-    name: t(`nav.${item.key}`)
+    name: t(`nav.${item.key}`),
   }));
 
   const handleNavChange = (name: string) => {
-    if (name === "Concept") setActiveTab("concept");
-    else if (name === "Registration") setActiveTab("register");
-    else if (name === "Live Registry") setActiveTab("registry");
-    else if (name === "Verification") setActiveTab("verify");
+    const item = allNavItems.find((i) => i.name === name);
+    if (item) setActiveTab(item.key as Tab);
   };
 
   const getActiveNavName = () => {
-    if (activeTab === "concept") return "Concept";
-    if (activeTab === "register") return "Registration";
-    if (activeTab === "registry") return "Live Registry";
-    if (activeTab === "verify") return "Verification";
-    return "Concept";
+    return allNavItems.find((i) => i.key === activeTab)?.name || "Concept";
   };
+
+  // Auto-select a product for pricing if one was just created and none is selected.
+  // If pricing tab is active but no product is selected, pick the latest.
+  useEffect(() => {
+    if (activeTab === "pricing" && !pricingProductId && products.length > 0) {
+      setPricingProductId(products[0].id);
+    }
+  }, [activeTab, pricingProductId, products]);
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-stone-900">
@@ -120,38 +166,36 @@ export default function App() {
         {isAppLoading && <LoadingScreen onComplete={() => setIsAppLoading(false)} />}
       </AnimatePresence>
 
-      <Header 
-        navItems={navItems}
+      <Header
+        navItems={allNavItems}
         activeItem={getActiveNavName()}
         onChange={handleNavChange}
       />
 
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-        {/* Tubelight Navbar (Hidden on mobile, shown on desktop) */}
-        <div className="hidden sm:block">
-          <NavBar 
-            items={translatedNavItems} 
-            activeItem={t(`nav.${navItems.find(i => i.name === getActiveNavName())?.key}`)} 
+        {/* Desktop navbar — all tabs */}
+        <div className="hidden sm:flex justify-center mb-8 z-50 relative">
+          <SlideTabs
+            items={translatedNavItems}
+            activeItem={t(`nav.${allNavItems.find((i) => i.key === activeTab)?.key}`)}
             onChange={(name) => {
-              const originalItem = translatedNavItems.find(i => i.name === name);
-              if (originalItem) {
-                const idx = translatedNavItems.indexOf(originalItem);
-                handleNavChange(navItems[idx].name);
-              }
-            }} 
+              const idx = translatedNavItems.findIndex((i) => i.name === name);
+              if (idx >= 0 && allNavItems[idx]) handleNavChange(allNavItems[idx].name);
+            }}
           />
         </div>
 
-        {/* Tab Content with AnimatePresence */}
+        {/* Tab Content */}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}>
-
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          >
+            {/* ── ORIGINAL TABS (unchanged) ── */}
             {activeTab === "concept" && <ConceptSection sarees={sarees} />}
             {activeTab === "register" && <RegisterForm onRegisterSuccess={handleNewRegistration} />}
             {activeTab === "registry" && (
@@ -170,9 +214,35 @@ export default function App() {
               <VerifySection sarees={sarees} currentSareeId={selectedSareeId} isLocked={isLocked} />
             )}
 
+            {/* ── MARKETPLACE MODULE TABS ── */}
+            {activeTab === "village" && (
+              <VillageAssistant />
+            )}
+            {activeTab === "pricing" && (
+              pricingProductId ? (
+                <PriceBreakdownView
+                  productId={pricingProductId}
+                  onPublished={handlePublished}
+                  onViewStore={handleViewStore}
+                />
+              ) : (
+                <div className="bg-white border border-[#1a1a1a]/15 p-8 text-center text-[#1a1a1a]/50 font-serif">
+                  No product to price. Onboard a weaver first.
+                  <br />
+                  <button onClick={() => setActiveTab("onboard")} className="mt-3 text-xs font-sans font-bold text-[#b45309] uppercase tracking-wider">
+                    Go to Onboarding →
+                  </button>
+                </div>
+              )
+            )}
+            {activeTab === "store" && (
+              <Storefront onSelectProduct={handleStoreSelectProduct} />
+            )}
+            {activeTab === "demand" && (
+              <DemandDashboard weaverId={demandWeaverId} />
+            )}
           </motion.div>
         </AnimatePresence>
-
       </main>
 
       {/* Footer */}

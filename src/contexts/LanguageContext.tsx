@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { MODULE_STRINGS } from '../marketplace/i18n';
 
 export type Language = 'en' | 'hi';
 
@@ -419,7 +420,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
 
   const t = (key: string) => {
-    return translations[language][key] || key;
+    // Look up in the core map first, then the module strings, then EN fallback, else the key.
+    return (
+      translations[language][key] ||
+      MODULE_STRINGS[language][key] ||
+      translations.en[key] ||
+      MODULE_STRINGS.en[key] ||
+      key
+    );
   };
 
   return (

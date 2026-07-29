@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, Video, MoreVertical, Paperclip, Camera, Send, CheckCheck, Globe } from "lucide-react";
+import { Phone, Video, MoreVertical, Paperclip, Camera, Send, CheckCheck, Globe, Mic } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 
 interface Message {
@@ -16,11 +16,27 @@ interface WhatsAppSimulatorProps {
   onRegister: (sareeData: any) => void;
 }
 
+/**
+ * Registration fields the bot collects, in order.
+ * Photo fields (headshot_photo, fabric_sample_photo) are handled separately 
+ * because they require file upload, not text/voice.
+ */
+const TEXT_FIELDS = [
+  "full_name", "mobile_number", "age", "village_town", "district",
+  "state", "pin_code", "weaving_style", "years_experience",
+  "material_type", "cooperative_society", "product_type",
+  "bank_upi_id", "id_proof_number"
+] as const;
+
+/**
+ * All bot flow steps including photo and consent steps.
+ * The `field` key is used to map answers into weaverData.
+ */
 const botFlow = [
   { 
     field: "language", 
-    en: "Welcome to Asli Taana! Please choose your language:\n1. English\n2. Hindi (हिंदी)", 
-    hi: "असली ताना में आपका स्वागत है! कृपया अपनी भाषा चुनें:\n1. English\n2. Hindi (हिंदी)" 
+    en: "Hello! Welcome to Asli Taana, Please chose your language .\nनमस्ते! 'असली ताना' में आपका स्वागत है, कृपया अपनी भाषा चुनें।\n1. English , 2. हिंदी \nOr you can speak in the mic with all the details \nया फिर आप माइक पर सारी जानकारी बोल सकते हैं।", 
+    hi: "Hello! Welcome to Asli Taana, Please chose your language .\nनमस्ते! 'असली ताना' में आपका स्वागत है, कृपया अपनी भाषा चुनें।\n1. English , 2. हिंदी \nOr you can speak in the mic with all the details \nया फिर आप माइक पर सारी जानकारी बोल सकते हैं।" 
   }, // 0
   { 
     field: "full_name", 
@@ -120,11 +136,178 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Data collected during chat
   const [weaverData, setWeaverData] = useState<any>({});
   const [botLang, setBotLang] = useState<"en" | "hi">("en");
+
+  /**
+   * Smart Voice Handler — allows long-form speech at step 0 (greeting).
+   * The weaver can speak ALL their details at once. The AI extracts fields,
+   * auto-detects language, and then the bot only asks the MISSING questions.
+   * 
+   * At later steps, mic works as simple single-answer voice input.
+   */
+  const handleMicClick = () => {
+    if (isListening) return;
+    
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(botLang === "hi" ? "आपका ब्राउज़र वॉयस इनपुट का समर्थन नहीं करता है।" : "Your browser does not support voice input.");
+      return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    // At step 0 we don't know language yet, so listen in both 
+    recognition.lang = step === 0 ? "hi-IN" : (botLang === "hi" ? "hi-IN" : "en-US");
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    // Allow longer speech at the greeting step
+    recognition.continuous = step === 0;
+    
+    let fullTranscript = "";
+    
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event: any) => {
+      // Accumulate all results for continuous mode
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          fullTranscript += (fullTranscript ? " " : "") + event.results[i][0].transcript;
+        }
+      }
+      if (step === 0) {
+        // Don't set inputValue yet — we'll process the full transcript on end
+        setInputValue(fullTranscript);
+      } else {
+        setInputValue(fullTranscript || event.results[0][0].transcript);
+      }
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => {
+      setIsListening(false);
+      // At step 0, if we got substantial speech, auto-process it
+      if (step === 0 && fullTranscript.split(" ").length >= 5) {
+        handleVoiceBulkInput(fullTranscript);
+      }
+    };
+    
+    recognition.start();
+  };
+
+  /**
+   * Processes a long voice transcript from step 0.
+   * Sends it to /api/extract-voice-data, gets back structured fields,
+   * auto-detects language, and jumps to the first missing question.
+   */
+  const handleVoiceBulkInput = async (transcript: string) => {
+    // Show the user's speech as a message
+    setMessages((prev) => [...prev, {
+      id: Date.now().toString(),
+      sender: "user",
+      text: transcript
+    }]);
+    setInputValue("");
+    setIsExtracting(true);
+    setIsTyping(true);
+
+    try {
+      const response = await fetch("/api/extract-voice-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript })
+      });
+
+      if (!response.ok) throw new Error("Extraction failed");
+
+      const { extracted, detectedLang, fieldsFound } = await response.json();
+
+      // Auto-set language based on what the weaver spoke
+      const lang = detectedLang === "hi" ? "hi" : "en";
+      setBotLang(lang);
+
+      // Merge extracted data into weaverData
+      const newData = { ...weaverData, ...extracted };
+      setWeaverData(newData);
+
+      setIsExtracting(false);
+
+      // Build a confirmation message listing what we understood
+      const fieldLabels: Record<string, { en: string; hi: string }> = {
+        full_name: { en: "Name", hi: "नाम" },
+        mobile_number: { en: "Phone", hi: "फ़ोन" },
+        age: { en: "Age", hi: "उम्र" },
+        village_town: { en: "Village", hi: "गांव" },
+        district: { en: "District", hi: "जिला" },
+        state: { en: "State", hi: "राज्य" },
+        pin_code: { en: "PIN Code", hi: "पिन कोड" },
+        weaving_style: { en: "Weaving Style", hi: "बुनाई शैली" },
+        years_experience: { en: "Experience", hi: "अनुभव" },
+        material_type: { en: "Material", hi: "सामग्री" },
+        cooperative_society: { en: "Cooperative", hi: "सहकारी समिति" },
+        product_type: { en: "Product", hi: "उत्पाद" },
+        bank_upi_id: { en: "UPI/Bank", hi: "UPI/बैंक" },
+        id_proof_number: { en: "ID Proof", hi: "पहचान प्रमाण" },
+      };
+
+      if (fieldsFound.length > 0) {
+        const foundList = fieldsFound
+          .map((f: string) => `✅ ${fieldLabels[f]?.[lang] || f}: ${extracted[f]}`)
+          .join("\n");
+
+        const confirmMsg = lang === "hi"
+          ? `🎙️ मैंने यह समझा:\n\n${foundList}\n\nअब मैं बाकी सवाल पूछता/पूछती हूँ...`
+          : `🎙️ I understood the following:\n\n${foundList}\n\nNow I'll ask you the remaining questions...`;
+        
+        addBotMessage(confirmMsg);
+
+        // Find the first unanswered step and jump to it
+        setTimeout(() => {
+          jumpToNextMissing(newData, lang);
+        }, 1200);
+      } else {
+        // Couldn't extract anything — fall back to normal flow
+        const fallbackMsg = lang === "hi"
+          ? "मैं आपकी बात पूरी तरह समझ नहीं पाया। चलिए एक-एक सवाल से शुरू करते हैं।"
+          : "I couldn't fully understand. Let's go through the questions one by one.";
+        addBotMessage(fallbackMsg);
+        setTimeout(() => {
+          setStep(1);
+          addBotMessage(botFlow[1][lang]);
+        }, 1200);
+      }
+    } catch (err) {
+      console.error("Voice extraction error:", err);
+      setIsExtracting(false);
+      setIsTyping(false);
+      // Fallback to normal step-by-step flow
+      setBotLang("en");
+      setStep(1);
+      addBotMessage(botFlow[1].en);
+    }
+  };
+
+  /**
+   * Finds the next bot flow step whose field has NOT yet been filled
+   * in weaverData, and jumps directly to it. Skips photo steps that
+   * haven't been answered (photos always need manual upload).
+   */
+  const jumpToNextMissing = (data: any, lang: "en" | "hi") => {
+    // Steps 1-16 are data collection, step 17 is consent, step 18 is done
+    for (let i = 1; i <= 16; i++) {
+      const field = botFlow[i].field;
+      if (!data[field]) {
+        setStep(i);
+        addBotMessage(botFlow[i][lang]);
+        return;
+      }
+    }
+    // If all fields are filled, go to consent
+    setStep(17);
+    addBotMessage(botFlow[17][lang]);
+  };
 
   const scrollToBottom = () => {
     const parent = messagesEndRef.current?.parentElement;
@@ -137,9 +320,12 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     scrollToBottom();
   }, [messages, isTyping, isValidating]);
 
-  // Initial greeting
+  const hasGreeted = useRef(false);
+
+  // Initial greeting — only once
   useEffect(() => {
-    if (step === 0 && messages.length === 0) {
+    if (step === 0 && messages.length === 0 && !hasGreeted.current) {
+      hasGreeted.current = true;
       addBotMessage(botFlow[0].en);
     }
   }, []);
@@ -184,17 +370,27 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     
-    // Process Language Step Specially
+    // ── Step 0: Language selection or short text input ──
     if (step === 0) {
       const lower = inputValue.toLowerCase();
       let selectedLang: "en" | "hi" = "en";
-      if (lower.includes("2") || lower.includes("hi") || lower.includes("hindi") || lower.includes("हिंदी")) {
+
+      // Detect language from the typed/spoken input
+      const hindiChars = (inputValue.match(/[\u0900-\u097F]/g) || []).length;
+      const hindiKeywords = /mera|naam|hai|hoon|gaon|saal|hindi|हिंदी/i.test(lower);
+
+      if (lower.includes("2") || lower.includes("hindi") || lower.includes("हिंदी") || hindiChars > 3 || hindiKeywords) {
         selectedLang = "hi";
-        setBotLang("hi");
-      } else {
-        selectedLang = "en";
-        setBotLang("en");
       }
+      setBotLang(selectedLang);
+
+      // Check if the input contains substantial info (more than just "1" or "English")
+      if (inputValue.trim().split(" ").length >= 5) {
+        // They typed/spoke a lot — treat as bulk voice input
+        handleVoiceBulkInput(inputValue.trim());
+        return;
+      }
+
       const nextStep = step + 1;
       setStep(nextStep);
       addBotMessage(botFlow[nextStep][selectedLang]);
@@ -211,10 +407,15 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
 
     if (validation.isValid) {
       // Save data
-      setWeaverData((prev: any) => ({ ...prev, [currentField]: inputValue }));
+      const newData = { ...weaverData, [currentField]: inputValue };
+      setWeaverData(newData);
 
-      // Trigger next step
-      const nextStep = step + 1;
+      // ── Smart skip: find next UNANSWERED step ──
+      let nextStep = step + 1;
+      while (nextStep < botFlow.length - 1 && newData[botFlow[nextStep].field]) {
+        // Skip steps that are already filled (from voice bulk input)
+        nextStep++;
+      }
       setStep(nextStep);
       
       if (nextStep < botFlow.length) {
@@ -265,10 +466,10 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     }
   }, [step, isTyping, weaverData, onRegister, hasSubmitted]);
 
-  // Handle mock photo upload
+  // Handle photo upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-const isPhotoStep = step === 4 || step === 14;
+    const isPhotoStep = step === 4 || step === 14;
     
     if (file && isPhotoStep) {
       const reader = new FileReader();
@@ -283,9 +484,14 @@ const isPhotoStep = step === 4 || step === 14;
         }]);
         
         const currentField = botFlow[step].field;
-        setWeaverData((prev: any) => ({ ...prev, [currentField]: base64 }));
-        
-        const nextStep = step + 1;
+        const newData = { ...weaverData, [currentField]: base64 };
+        setWeaverData(newData);
+
+        // Smart skip after photo too
+        let nextStep = step + 1;
+        while (nextStep < botFlow.length - 1 && newData[botFlow[nextStep].field]) {
+          nextStep++;
+        }
         setStep(nextStep);
         addBotMessage(botFlow[nextStep][botLang]);
       };
@@ -355,10 +561,11 @@ const isPhotoStep = step === 4 || step === 14;
             ))}
           </AnimatePresence>
 
-          {(isTyping || isValidating) && (
+          {(isTyping || isValidating || isExtracting) && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-lg rounded-tl-none p-3 shadow-sm w-max">
               <div className="flex gap-1 items-center">
-                {isValidating && <span className="text-xs mr-2 text-stone-500">{botLang === "hi" ? "जांच हो रही है..." : "Validating..."}</span>}
+                {isExtracting && <span className="text-xs mr-2 text-stone-500">{botLang === "hi" ? "🎙️ समझ रहा हूँ..." : "🎙️ Understanding..."}</span>}
+                {isValidating && !isExtracting && <span className="text-xs mr-2 text-stone-500">{botLang === "hi" ? "जांच हो रही है..." : "Validating..."}</span>}
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></span>
@@ -380,7 +587,7 @@ const isPhotoStep = step === 4 || step === 14;
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              disabled={isPhotoStep || isTyping || isValidating || step === 17}
+              disabled={isPhotoStep || isTyping || isValidating || step === 17 || isListening || isExtracting}
             />
             
             {isPhotoStep ? (
@@ -403,13 +610,18 @@ const isPhotoStep = step === 4 || step === 14;
           </div>
           
           <button 
-            onClick={handleSend}
-            disabled={(!inputValue.trim() && !isPhotoStep) || isTyping || isValidating || step === 17}
+            onClick={(!inputValue.trim() && !isPhotoStep) ? handleMicClick : handleSend}
+            disabled={isTyping || isValidating || step === 17 || isListening || isExtracting}
             className={`w-[46px] h-[46px] rounded-full flex items-center justify-center shadow-sm shrink-0 transition-colors ${
-              (inputValue.trim() && !isPhotoStep && !isTyping && !isValidating && step !== 17) ? "bg-[#075e54] text-white" : "bg-[#075e54]/50 text-white"
+              isListening ? "bg-red-500 text-white animate-pulse" : "bg-[#075e54] text-white"
             }`}
+            title={(!inputValue.trim() && !isPhotoStep) ? "Voice Input" : "Send"}
           >
-            <Send className="w-5 h-5 ml-1" />
+            {(!inputValue.trim() && !isPhotoStep) ? (
+              <Mic className="w-5 h-5" />
+            ) : (
+              <Send className="w-5 h-5 ml-1" />
+            )}
           </button>
         </div>
       </div>
