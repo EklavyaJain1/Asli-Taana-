@@ -2,11 +2,16 @@
  * Public buyer-facing Storefront.
  *
  * Shows only published products with the Fairness Badge and a visible price
- * breakdown summary. Clicking "See price breakdown" links to Module 2's full
- * view. This is the buyer-facing end of the demo loop.
+ * breakdown summary. Clicking a card opens a detail overlay with a GSAP
+ * animation (scale-up entrance, scale-down exit). The overlay shares
+ * layoutId with the clicked card for Framer Motion morph.
+ *
+ * Lenis smooth scroll is provided at the app root (main.tsx); the overlay
+ * pauses it via body overflow hidden while open.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { gsap } from "gsap";
 import {
   User, MapPin, Eye, IndianRupee,
   CheckCircle2, AlertTriangle, XCircle, Store,
@@ -70,13 +75,51 @@ export default function Storefront({
   const published = db.products.filter((p) => p.published);
   const isOpen = !!selectedProductId;
 
+  // Ref for the detail panel so GSAP can animate it.
+  const panelRef = useRef<HTMLDivElement>(null);
+
   // Lock body scroll while the detail overlay is open.
+  // Also pause Lenis smooth scroll so wheel events stop scrolling the
+  // background page (overflow-hidden alone doesn't stop Lenis, which drives
+  // scroll via JS transforms).
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add("overflow-hidden");
-      return () => document.body.classList.remove("overflow-hidden");
+      const lenis = (window as any).lenis;
+      lenis?.stop?.();
+      return () => {
+        document.body.classList.remove("overflow-hidden");
+        lenis?.start?.();
+      };
     }
   }, [isOpen]);
+
+  // GSAP entrance animation when a card is selected.
+  useEffect(() => {
+    if (!isOpen || !panelRef.current) return;
+    const el = panelRef.current;
+    // Reset then animate in
+    gsap.set(el, { scale: 0.88, opacity: 0, y: 40 });
+    gsap.to(el, {
+      scale: 1, opacity: 1, y: 0,
+      duration: 0.45,
+      ease: "back.out(1.4)",
+    });
+  }, [isOpen]);
+
+  // GSAP exit animation when the overlay is about to close.
+  const handleClose = () => {
+    if (!panelRef.current) {
+      onCloseProduct?.();
+      return;
+    }
+    gsap.to(panelRef.current, {
+      scale: 0.88, opacity: 0, y: 40,
+      duration: 0.25,
+      ease: "back.in(1.4)",
+      onComplete: onCloseProduct,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -88,7 +131,7 @@ export default function Storefront({
       />
 
       {published.length === 0 ? (
-        <div className="bg-white border border-[#1a1a1a]/15 p-12 text-center text-[#1a1a1a]/50 font-serif italic text-lg">
+        <div className="rounded-3xl bg-white border border-[#1a1a1a]/10 p-12 text-center text-[#1a1a1a]/50 font-serif italic text-lg">
           {t("store.empty")}
         </div>
       ) : (
@@ -106,9 +149,6 @@ export default function Storefront({
                 product={product}
                 weaver={weaver}
                 theme={theme}
-                // The selected card shares its layoutId with the detail overlay
-                // so Framer Motion morphs it open / shut. Non-selected cards
-                // keep their normal entrance animation.
                 isActive={selectedProductId === product.id}
                 onSelectProduct={onSelectProduct}
               />
@@ -117,43 +157,48 @@ export default function Storefront({
         </motion.div>
       )}
 
-      {/* ── In-place detail overlay (card → detail morph) ──
-          The overlay shares the same layoutId as the active card so the
-          expand/collapse is a continuous shared-layout animation, exactly the
-          effect from the linear-card component. The nav stays on "store". */}
+      {/* ── In-place detail overlay (card → detail with GSAP morph) ── */}
       <AnimatePresence>
         {isOpen && selectedProductId && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop — above sticky header */}
             <motion.div
-              className="fixed inset-0 z-40 bg-[#1a1a1a]/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[55] bg-[#1a1a1a]/40 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={onCloseProduct}
+              onClick={handleClose}
             />
-            {/* Detail panel — morphs from the clicked card */}
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+            {/* Detail panel — GSAP-animated, higher z.
+                data-lenis-prevent tells Lenis to ignore wheel/touch inside
+                this container so the panel scrolls instead of the background. */}
+            <div
+              className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+              data-lenis-prevent
+            >
               <motion.div
+                ref={panelRef}
                 layoutId={`product-card-${selectedProductId}`}
-                className="relative w-full max-w-3xl bg-[#fcf8f2] rounded-2xl border border-[#1a1a1a]/15 shadow-2xl overflow-hidden my-4"
+                className="relative w-full max-w-3xl bg-[#f0ece4] rounded-3xl border-2 border-[#1a1a1a] shadow-2xl overflow-hidden my-4"
                 transition={{ type: "spring", bounce: 0.05, duration: 0.5 }}
               >
-                {/* Close button */}
+                {/* Close button — rounded */}
                 <button
-                  onClick={onCloseProduct}
-                  className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center hover:bg-[#b45309] transition-colors"
+                  onClick={handleClose}
+                  className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center hover:bg-[#b45309] transition-colors shadow-md"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
                 </button>
 
-                {/* The real price breakdown module renders inside the morphed panel */}
-                <PriceBreakdownView
-                  productId={selectedProductId}
-                  onPublished={onPublished}
-                  onViewStore={onCloseProduct}
-                />
+                {/* pt clears the floating close button so the fairness badge
+                    and its siblings below it don't sit under it. */}
+                <div className="pt-12">
+                  <PriceBreakdownView
+                    productId={selectedProductId}
+                    onPublished={onPublished}
+                  />
+                </div>
               </motion.div>
             </div>
           </>
@@ -197,14 +242,10 @@ function ProductCard({
 
   return (
     <motion.article
-      // When this card is the active (selected) one, it shares a layoutId with
-      // the detail overlay, so Framer Motion morphs the card into the overlay
-      // and back. Non-active cards just animate in normally.
       layoutId={isActive ? `product-card-${product.id}` : undefined}
       variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } }}
-      className="group relative rounded-2xl flex flex-col overflow-hidden border border-[#1a1a1a]/10"
+      className="group relative rounded-3xl flex flex-col overflow-hidden border border-[#1a1a1a]/10"
       style={{
-        // Light per-product gradient: tint fades to near-white, never dark.
         background: `linear-gradient(165deg, ${theme.tint} 0%, #ffffff 60%, ${theme.tint} 100%)`,
       }}
       whileHover={{
@@ -230,13 +271,13 @@ function ProductCard({
           <motion.img
             src={product.photo}
             alt={title}
-            className="relative z-10 m-2 rounded-xl w-[calc(100%-1rem)] h-[calc(100%-1rem)] object-cover shadow-md"
+            className="relative z-10 m-2 rounded-2xl w-[calc(100%-1rem)] h-[calc(100%-1rem)] object-cover shadow-md"
             animate={{ scale: isHovered ? 1.06 : 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           />
         ) : (
           <div
-            className="relative z-10 m-2 rounded-xl w-[calc(100%-1rem)] h-[calc(100%-1rem)] flex items-center justify-center"
+            className="relative z-10 m-2 rounded-2xl w-[calc(100%-1rem)] h-[calc(100%-1rem)] flex items-center justify-center"
             style={{ background: `linear-gradient(135deg, ${theme.accent}33, ${theme.tint})` }}
           >
             <IndianRupee className="h-10 w-10 text-[#1a1a1a]/20" />
@@ -244,7 +285,7 @@ function ProductCard({
         )}
 
         {/* Fairness badge — top-left */}
-        <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-[#1a1a1a]/10 px-2 py-1 shadow-sm rounded-full">
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-[#1a1a1a]/10 px-2.5 py-1.5 shadow-sm rounded-full">
           <badge.icon className="h-3 w-3" style={{ color: badge.color }} />
           <span className="text-[8px] font-sans font-bold tracking-widest uppercase" style={{ color: badge.color }}>
             {badge.label}
@@ -317,11 +358,10 @@ function ProductCard({
           </div>
         </div>
 
-        {/* View CTA */}
+        {/* View CTA — rounded */}
         <motion.div
-          className="mt-2.5 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-white text-[9px] font-sans font-bold tracking-widest uppercase"
+          className="mt-2.5 flex items-center justify-center gap-1.5 py-2 rounded-2xl text-white text-[9px] font-sans font-bold tracking-widest uppercase"
           style={{ backgroundColor: isHovered ? theme.accent : "#1a1a1a" }}
-          animate={{}}
           transition={{ duration: 0.25 }}
         >
           {t("store.viewDetails") || "View Details"}

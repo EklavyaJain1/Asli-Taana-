@@ -120,10 +120,6 @@ export default function App() {
     setActiveTab("store");
   }, []);
 
-  const handleViewStore = useCallback(() => {
-    setActiveTab("store");
-  }, []);
-
   const handleStoreSelectProduct = useCallback((id: string) => {
     // NOTE: we deliberately do NOT call setActiveTab here. Switching to the
     // invisible "pricing" tab made the nav highlight fall back to "Concept".
@@ -236,7 +232,6 @@ export default function App() {
                 <PriceBreakdownView
                   productId={pricingProductId}
                   onPublished={handlePublished}
-                  onViewStore={handleViewStore}
                 />
               ) : (
                 <div className="bg-white border border-[#1a1a1a]/15 p-8 text-center text-[#1a1a1a]/50 font-serif">
