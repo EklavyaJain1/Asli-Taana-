@@ -198,20 +198,29 @@ export default function WhatsAppSimulator({ onRegister }: WhatsAppSimulatorProps
     accumulatedTranscript.current = "";
 
     recognition.onresult = (event: any) => {
-      let finalText = "";
-      let currentInterim = "";
-      for (let i = 0; i < event.results.length; i++) {
+      // event.resultIndex is the index of the first CHANGED result in this
+      // event. Only results from resultIndex onwards are new — iterating the
+      // whole event.results array every time caused final + interim copies of
+      // the same phrase to be concatenated ("...eklavya ...eklavya").
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          finalText += result[0].transcript;
-        } else {
-          currentInterim += result[0].transcript;
+          // Append only genuinely new final text to the running transcript.
+          const chunk = (result[0].transcript || "").trim();
+          if (chunk) {
+            accumulatedTranscript.current = (accumulatedTranscript.current + " " + chunk).trim();
+          }
         }
       }
-      accumulatedTranscript.current = finalText;
+
+      // The interim result is the LAST (still-changing) entry, if any.
+      let currentInterim = "";
+      const last = event.results[event.results.length - 1];
+      if (last && !last.isFinal) {
+        currentInterim = (last[0].transcript || "").trim();
+      }
       setInterimText(currentInterim);
-      // Show accumulated + interim in the input for visual feedback
-      setInputValue((finalText + (currentInterim ? " " + currentInterim : "")).trim());
+      setInputValue((accumulatedTranscript.current + (currentInterim ? " " + currentInterim : "")).trim());
     };
 
     recognition.onerror = (e: any) => {

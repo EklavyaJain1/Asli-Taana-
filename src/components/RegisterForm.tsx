@@ -53,6 +53,15 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
   const [weaverAgeError, setWeaverAgeError] = useState("");
   const [village, setVillage] = useState("Chanderi");
   const [cooperative, setCooperative] = useState("Chanderi Handloom Weavers Union");
+  const [hasCooperative, setHasCooperative] = useState(true);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [weaverState, setWeaverState] = useState("");
+  const [district, setDistrict] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [yearsExperience, setYearsExperience] = useState<number | "">("");
+  const [productType, setProductType] = useState("Saree");
+  const [bankUpiId, setBankUpiId] = useState("");
+  const [consent, setConsent] = useState(false);
   const [material, setMaterial] = useState("Silk");
   const [daysOfLabor, setDaysOfLabor] = useState(14);
   const [price, setPrice] = useState(12500);
@@ -264,7 +273,15 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
       alert("Please capture or upload the Master Fingerprint Photo (Macro shot) before registering.");
       return;
     }
-    
+    if (!phoneNumber.trim()) {
+      alert("Please enter your phone number before registering.");
+      return;
+    }
+    if (!consent) {
+      alert("Please give your consent (tick the last checkbox) to register.");
+      return;
+    }
+
     setIsRegistering(true);
 
     try {
@@ -272,10 +289,19 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          weaverName, weaverAge, weaverBio, village, cooperative,
+          weaverName, weaverAge, weaverBio, village,
+          cooperative: hasCooperative ? cooperative : "",
           material, daysOfLabor, price, patternType,
           colors, weaverPhoto, referencePhoto: referenceFingerprint,
-          detectedStyle, styleConfidence, styleNotes
+          detectedStyle, styleConfidence, styleNotes,
+          mobile_number: phoneNumber,
+          state: weaverState,
+          district,
+          pin_code: pinCode,
+          years_experience: yearsExperience === "" ? 0 : yearsExperience,
+          product_type: productType,
+          bank_upi_id: bankUpiId,
+          consent: consent ? "YES" : "NO",
         }),
       });
 
@@ -438,11 +464,50 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                   value={village} onChange={(e) => setVillage(e.target.value)} />
               </div>
               <div>
-                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.coop")} *</label>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.phone")} *</label>
+                <input type="tel" required pattern="[0-9+\-\s]{7,15}" placeholder="e.g. 9876543210"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-4">
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.state")} *</label>
                 <input type="text" required
                   className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
-                  value={cooperative} onChange={(e) => setCooperative(e.target.value)} />
+                  value={weaverState} onChange={(e) => setWeaverState(e.target.value)} />
               </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.district")} *</label>
+                <input type="text" required
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={district} onChange={(e) => setDistrict(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.pincode")} *</label>
+                <input type="text" required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="6-digit PIN"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={pinCode} onChange={(e) => setPinCode(e.target.value.replace(/[^0-9]/g, ""))} />
+              </div>
+            </div>
+
+            {/* Cooperative Society — optional toggle */}
+            <div className="mt-4 border border-[#1a1a1a]/15 bg-white p-4">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" checked={hasCooperative}
+                  onChange={(e) => setHasCooperative(e.target.checked)}
+                  className="h-4 w-4 accent-[#b45309] cursor-pointer" />
+                <span className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a]">{t("register.coop.toggle")}</span>
+              </label>
+              {hasCooperative && (
+                <div className="mt-3">
+                  <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.coop")}</label>
+                  <input type="text"
+                    className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                    value={cooperative} onChange={(e) => setCooperative(e.target.value)} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -456,6 +521,32 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
               <input type="text" required
                 className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
                 value={patternType} onChange={(e) => setPatternType(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.productType")} *</label>
+                <select required
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={productType} onChange={(e) => setProductType(e.target.value)}>
+                  <option value="Saree">Saree</option>
+                  <option value="Dupatta">Dupatta</option>
+                  <option value="Stole">Stole</option>
+                  <option value="Scarf">Scarf</option>
+                  <option value="Shawl">Shawl</option>
+                  <option value="Fabric (by metre)">Fabric (by metre)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.experience")}</label>
+                <input type="number" min="0" max="80" placeholder="e.g. 20"
+                  className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+                  value={yearsExperience} onChange={(e) => {
+                    const v = e.target.value;
+                    setYearsExperience(v === "" ? "" : Number(v));
+                  }} />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -478,6 +569,18 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                   value={price} onChange={(e) => setPrice(Number(e.target.value))} />
               </div>
             </div>
+          </div>
+
+          {/* Bank / UPI details */}
+          <div className="bg-white p-5 rounded-none border border-[#1a1a1a]/15 mt-5">
+            <h4 className="text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-3 border-b border-[#1a1a1a]/10 pb-2">
+              {t("register.payment")}
+            </h4>
+            <label className="block text-[10px] font-sans uppercase tracking-wider font-bold text-[#1a1a1a] mb-1.5">{t("register.upi")}</label>
+            <input type="text" placeholder="e.g. weavername@upi"
+              className="w-full text-sm border border-[#1a1a1a]/20 rounded-none p-2.5 bg-white text-[#1a1a1a] focus:bg-white focus:outline-none focus:border-[#1a1a1a] transition-all font-serif"
+              value={bankUpiId} onChange={(e) => setBankUpiId(e.target.value)} />
+            <p className="text-[10px] text-[#1a1a1a]/50 mt-1.5 font-serif italic">{t("register.upi.hint")}</p>
           </div>
           
           <div className="bg-white p-5 rounded-none border border-[#1a1a1a]/15 mt-5">
@@ -587,7 +690,28 @@ export default function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
             </div>
           )}
 
-          <button type="submit" disabled={isRegistering || cameraActive || !referenceFingerprint}
+          {/* Consent — final step */}
+          <div className="mt-4 border-2 border-[#b45309]/40 bg-[#b45309]/5 p-4">
+            <p className="text-[9px] font-sans uppercase tracking-widest font-bold text-[#b45309] mb-2">
+              {t("register.consent.badge")}
+            </p>
+            <p className="text-xs font-serif text-[#1a1a1a] leading-relaxed mb-3">
+              {t("register.consent.text")}
+            </p>
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="h-4 w-4 mt-0.5 accent-[#b45309] cursor-pointer shrink-0" />
+              <span className="text-[11px] font-sans font-bold text-[#1a1a1a] uppercase tracking-wider">
+                {t("register.consent.checkbox")}
+              </span>
+            </label>
+            {!consent && (
+              <p className="text-[10px] text-red-500 mt-2 font-sans">{t("register.consent.required")}</p>
+            )}
+          </div>
+
+          <button type="submit" disabled={isRegistering || cameraActive || !referenceFingerprint || !consent}
             className="w-full mt-auto bg-[#1a1a1a] hover:bg-[#b45309] text-white font-sans font-bold text-xs uppercase tracking-[0.2em] py-3.5 px-4 rounded-none border border-[#1a1a1a] transition-all disabled:opacity-50 shadow-xs">
             {isRegistering ? "Uploading structural fingerprint..." : t("register.submit")}
           </button>

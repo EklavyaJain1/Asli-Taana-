@@ -68,9 +68,9 @@ export default function DemandDashboard({ weaverId }: { weaverId?: string }) {
   const ctx = { t, craftType, weaver, priceRange, suggestion, tickerIdx };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 sm:pb-20">
       {/* ── Centered hero heading with a typewriter title ── */}
-      <div className="text-center flex flex-col items-center pt-2 pb-1">
+      <div className="text-center flex flex-col items-center pt-4 pb-3 sm:pt-2 sm:pb-1">
         <motion.span
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,7 +109,7 @@ export default function DemandDashboard({ weaverId }: { weaverId?: string }) {
         ) : (
           <motion.div
             key="grid"
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 auto-rows-[110px] md:auto-rows-[124px]"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6 auto-rows-[150px] md:auto-rows-[124px]"
             initial="hidden"
             animate="visible"
             exit="hidden"
@@ -133,7 +133,7 @@ export default function DemandDashboard({ weaverId }: { weaverId?: string }) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.99 }}
                 className={`group relative overflow-hidden rounded-2xl border border-[#1a1a1a]/10 bg-white text-left
-                            shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[120px]
+                            shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[150px] sm:min-h-[120px]
                             ${SPANS[id]}`}
               >
                 <CardContent id={id} expanded={false} ctx={ctx} />
@@ -240,7 +240,7 @@ function DetailModal({ cardId, onSelect, onClose, renderContent }: DetailModalPr
       {/* Bottom dock — jump between tiles (fixed, not draggable). Raised above
           the modal + kept on top so it never gets underlaid by content. */}
       <motion.div
-        className="fixed z-[70] bottom-10 sm:bottom-12 left-1/2 -translate-x-1/2 px-4"
+        className="fixed z-[70] bottom-14 sm:bottom-12 left-1/2 -translate-x-1/2 px-4 pb-safe"
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 30, opacity: 0 }}

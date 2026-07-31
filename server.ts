@@ -232,7 +232,7 @@ app.post("/api/register", (req, res) => {
     consent,
   } = req.body;
 
-  if (!weaverName || !village || !cooperative || !material) {
+  if (!weaverName || !village || !material) {
     return res.status(400).json({ error: "Missing required fields for registration." });
   }
 
@@ -245,7 +245,7 @@ app.post("/api/register", (req, res) => {
     weaverAge: Number(weaverAge) || 45,
     weaverBio: weaverBio || "Dedicated traditional handloom artisan.",
     village,
-    cooperative,
+    cooperative: cooperative || "Independent (no cooperative)",
     material,
     daysOfLabor: Number(daysOfLabor) || 10,
     price: Number(price) || 12000,
